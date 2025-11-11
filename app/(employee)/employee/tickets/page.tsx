@@ -9,6 +9,9 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 import { CreateTicketDialog } from '@/components/tickets/create-ticket-dialog';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 export default function EmployeeTicketsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'Open' | 'In Progress' | 'Resolved' | 'Closed'>('all');

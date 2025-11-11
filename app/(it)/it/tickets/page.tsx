@@ -9,6 +9,9 @@ import { Ticket, Clock, Search, Filter } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 export default function ITTicketsPage() {
   const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');

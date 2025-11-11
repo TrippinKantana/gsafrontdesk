@@ -19,6 +19,9 @@ import { useToast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
 import { CalendarConnection } from '@/components/calendar/calendar-connection';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 export default function EmployeeMeetingsPage() {
   const { toast } = useToast();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);

@@ -10,6 +10,9 @@ import { CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 export default function EmployeeRespondPage() {
   const searchParams = useSearchParams();
   const router = useRouter();

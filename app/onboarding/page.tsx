@@ -6,6 +6,9 @@ import { useRouter } from 'next/navigation';
 import { trpc } from '@/lib/trpc';
 import { Loader2, Building2, CheckCircle } from 'lucide-react';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 export default function OnboardingPage() {
   const { organization, isLoaded } = useOrganization();
   const router = useRouter();

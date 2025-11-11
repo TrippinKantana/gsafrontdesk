@@ -18,6 +18,9 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useToast } from '@/components/ui/use-toast';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 type FilterType = 'today' | 'week' | 'all';
 
 export default function DashboardPage() {

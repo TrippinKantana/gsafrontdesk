@@ -12,6 +12,9 @@ import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import Link from 'next/link';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 export default function EmployeeTicketDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const { toast } = useToast();

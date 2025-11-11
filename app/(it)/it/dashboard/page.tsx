@@ -5,6 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Ticket, Clock, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 export default function ITDashboardPage() {
   // Fetch metrics
   const { data: metrics, isLoading: metricsLoading, error: metricsError } = trpc.ticket.getMetrics.useQuery(

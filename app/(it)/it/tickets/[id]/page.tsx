@@ -14,6 +14,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
 import { Clock, ArrowLeft, Send, CheckCircle, XCircle, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';

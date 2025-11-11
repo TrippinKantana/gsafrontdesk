@@ -14,6 +14,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
 import {
   Table,
   TableBody,

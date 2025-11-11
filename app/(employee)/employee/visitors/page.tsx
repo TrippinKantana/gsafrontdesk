@@ -13,6 +13,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
 import { CheckCircle, XCircle, Clock, Building2, User, LogOut, LogIn } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';

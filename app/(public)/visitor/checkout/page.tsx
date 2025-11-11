@@ -11,6 +11,9 @@ import { useToast } from '@/components/ui/use-toast';
 import Link from 'next/link';
 import { formatDate } from '@/lib/utils';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 export default function CheckoutPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [hasSearched, setHasSearched] = useState(false);

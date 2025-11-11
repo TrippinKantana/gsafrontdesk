@@ -14,6 +14,9 @@ import { CheckCircle2, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import Link from 'next/link';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 const visitorSchema = z.object({
   fullName: z.string().min(1, 'Full name is required'),
   company: z.string().min(1, 'Company, branch, or organization is required'),
