@@ -70,7 +70,7 @@ export function DashboardSearch() {
         suggestions.push({
           id: `staff-${s.id}`,
           title: s.fullName,
-          subtitle: s.department || s.title || s.email,
+          subtitle: (s.department || s.title || s.email) ?? undefined,
           type: 'staff',
           href: '/dashboard/staff',
           icon: User,
@@ -89,7 +89,7 @@ export function DashboardSearch() {
         suggestions.push({
           id: `visitor-${v.id}`,
           title: v.fullName,
-          subtitle: v.company || v.email,
+          subtitle: (v.company || v.email) ?? undefined,
           type: 'visitor',
           href: '/dashboard',
           icon: Users,
