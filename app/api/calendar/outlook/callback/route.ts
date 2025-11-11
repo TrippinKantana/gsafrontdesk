@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { exchangeCalendarCodeForTokens } from '@/lib/calendar';
-import { db } from '@/server/db';
 
 // Force dynamic rendering - prevent static analysis
 export const dynamic = 'force-dynamic';
@@ -13,6 +11,9 @@ export const revalidate = 0;
  * Handles the OAuth redirect from Microsoft after user authorization
  */
 export async function GET(request: NextRequest) {
+  // Lazy import to prevent build-time evaluation
+  const { exchangeCalendarCodeForTokens } = await import('@/lib/calendar');
+  const { db } = await import('@/server/db');
   try {
     const searchParams = request.nextUrl.searchParams;
     const code = searchParams.get('code');
