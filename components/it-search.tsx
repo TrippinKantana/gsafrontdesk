@@ -73,10 +73,11 @@ export function ITSearch() {
       )
       .slice(0, 4)
       .forEach((s) => {
+        const subtitleValue = s.department ?? s.title ?? s.email;
         suggestions.push({
           id: `staff-${s.id}`,
           title: s.fullName,
-          subtitle: s.department ?? s.title ?? s.email ?? undefined,
+          subtitle: subtitleValue ?? undefined,
           type: 'staff',
           href: '/it/tickets',
           icon: User,
