@@ -3,6 +3,15 @@ const nextConfig = {
   images: {
     domains: ['utfs.io', 'img.clerk.com'],
   },
+  // Skip build-time analysis for dynamic routes
+  experimental: {
+    outputFileTracingExcludes: {
+      '*': [
+        'node_modules/@swc/core*/**/*',
+        'node_modules/webpack/**/*',
+      ],
+    },
+  },
   // PWA configuration
   async headers() {
     return [
