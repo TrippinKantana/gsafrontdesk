@@ -23,8 +23,14 @@ export default async function ITLayout({
   // ✅ SECURITY: Check user role server-side - only IT Staff and Admin can access
   const userProfile = await getUserProfile();
   
-  if (userProfile && userProfile.role !== 'IT Staff' && userProfile.role !== 'Admin') {
-    // Redirect non-IT users to their correct dashboards
+  // SECURITY: Deny access if user profile doesn't exist
+  if (!userProfile) {
+    console.error('[IT Layout] ❌ User profile not found for userId:', userId);
+    redirect('/sign-in');
+  }
+  
+  // Redirect non-IT users to their correct dashboards
+  if (userProfile.role !== 'IT Staff' && userProfile.role !== 'Admin') {
     if (userProfile.role === 'Employee') {
       redirect('/employee/dashboard');
     } else if (userProfile.role === 'Receptionist') {

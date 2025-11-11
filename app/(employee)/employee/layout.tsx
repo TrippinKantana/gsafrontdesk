@@ -23,13 +23,17 @@ export default async function EmployeeLayout({
   // ✅ SECURITY: Check user role server-side - Employees, IT Staff, and Admin can access
   const userProfile = await getUserProfile();
   
-  if (userProfile) {
-    // Receptionist should go to admin dashboard
-    if (userProfile.role === 'Receptionist') {
-      redirect('/dashboard');
-    }
-    // Employee, IT Staff, and Admin can proceed
+  // SECURITY: Deny access if user profile doesn't exist
+  if (!userProfile) {
+    console.error('[Employee Layout] ❌ User profile not found for userId:', userId);
+    redirect('/sign-in');
   }
+  
+  // Receptionist should go to admin dashboard
+  if (userProfile.role === 'Receptionist') {
+    redirect('/dashboard');
+  }
+  // Employee, IT Staff, and Admin can proceed
 
   // ✅ Sync organization from Clerk to database if present
   if (orgId) {

@@ -25,15 +25,19 @@ export default async function DashboardLayout({
   // Redirect unauthorized users (Employee, IT Staff) to their correct dashboards
   const userProfile = await getUserProfile();
   
-  if (userProfile) {
-    // Redirect non-admin/receptionist users to their correct dashboards
-    if (userProfile.role === 'Employee') {
-      redirect('/employee/dashboard');
-    } else if (userProfile.role === 'IT Staff') {
-      redirect('/it/dashboard');
-    }
-    // Admin and Receptionist can proceed
+  // SECURITY: Deny access if user profile doesn't exist
+  if (!userProfile) {
+    console.error('[Dashboard Layout] ❌ User profile not found for userId:', userId);
+    redirect('/sign-in');
   }
+  
+  // Redirect non-admin/receptionist users to their correct dashboards
+  if (userProfile.role === 'Employee') {
+    redirect('/employee/dashboard');
+  } else if (userProfile.role === 'IT Staff') {
+    redirect('/it/dashboard');
+  }
+  // Admin and Receptionist can proceed
 
   // ✅ Sync organization from Clerk to database if present
   if (orgId) {
