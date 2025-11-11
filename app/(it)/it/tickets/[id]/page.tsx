@@ -25,7 +25,11 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
   const [message, setMessage] = useState('');
   const [isInternal, setIsInternal] = useState(false);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
-  const [updateForm, setUpdateForm] = useState({
+  const [updateForm, setUpdateForm] = useState<{
+    status: 'Open' | 'In Progress' | 'Resolved' | 'Closed' | '';
+    priority: 'Low' | 'Medium' | 'High' | 'Critical' | '';
+    resolutionNotes: string;
+  }>({
     status: '',
     priority: '',
     resolutionNotes: '',
@@ -74,8 +78,8 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
   const handleUpdateTicket = () => {
     updateTicket.mutate({
       id: params.id,
-      status: updateForm.status || undefined,
-      priority: updateForm.priority as any,
+      status: (updateForm.status || undefined) as 'Open' | 'In Progress' | 'Resolved' | 'Closed' | undefined,
+      priority: (updateForm.priority || undefined) as 'Low' | 'Medium' | 'High' | 'Critical' | undefined,
       resolutionNotes: updateForm.resolutionNotes || undefined,
     });
   };
@@ -83,8 +87,8 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
   const openUpdateDialog = () => {
     if (ticket) {
       setUpdateForm({
-        status: ticket.status,
-        priority: ticket.priority,
+        status: ticket.status as 'Open' | 'In Progress' | 'Resolved' | 'Closed' | '',
+        priority: ticket.priority as 'Low' | 'Medium' | 'High' | 'Critical' | '',
         resolutionNotes: ticket.resolutionNotes || '',
       });
     }
@@ -322,7 +326,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
               <select
                 id="status"
                 value={updateForm.status}
-                onChange={(e) => setUpdateForm({ ...updateForm, status: e.target.value })}
+                onChange={(e) => setUpdateForm({ ...updateForm, status: e.target.value as 'Open' | 'In Progress' | 'Resolved' | 'Closed' | '' })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
               >
                 <option value="Open">Open</option>
@@ -337,7 +341,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
               <select
                 id="priority"
                 value={updateForm.priority}
-                onChange={(e) => setUpdateForm({ ...updateForm, priority: e.target.value })}
+                onChange={(e) => setUpdateForm({ ...updateForm, priority: e.target.value as 'Low' | 'Medium' | 'High' | 'Critical' | '' })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
               >
                 <option value="Low">Low</option>
