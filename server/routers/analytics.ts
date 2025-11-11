@@ -13,6 +13,27 @@ export const analyticsRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       try {
+        // ✅ SECURITY: Require organization context
+        if (!ctx.organizationId) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Organization context is required for analytics.',
+          });
+        }
+
+        // ✅ Get internal organization ID from Clerk orgId
+        const organization = await ctx.db.organization.findUnique({
+          where: { clerkOrgId: ctx.organizationId },
+          select: { id: true },
+        });
+
+        if (!organization) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Organization not found',
+          });
+        }
+
         console.log('📊 Overview Metrics - Input:', input);
         const now = new Date();
         
@@ -28,12 +49,14 @@ export const analyticsRouter = createTRPCRouter({
         console.log('📊 Date Range:', { 
           startDate: startDate.toISOString(), 
           endDate: endDate.toISOString(),
-          input 
+          input,
+          organizationId: organization.id,
         });
 
-        // Get all visitors in date range with checkout times
+        // ✅ Get visitors in date range filtered by organization
         const visitors = await ctx.db.visitor.findMany({
           where: {
+            organizationId: organization.id, // ✅ Filter by organization
             checkInTime: {
               gte: startDate,
               lte: endDate,
@@ -122,6 +145,27 @@ export const analyticsRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       try {
+        // ✅ SECURITY: Require organization context
+        if (!ctx.organizationId) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Organization context is required for analytics.',
+          });
+        }
+
+        // ✅ Get internal organization ID from Clerk orgId
+        const organization = await ctx.db.organization.findUnique({
+          where: { clerkOrgId: ctx.organizationId },
+          select: { id: true },
+        });
+
+        if (!organization) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Organization not found',
+          });
+        }
+
         console.log('👥 Visitor Analytics - Input:', input);
         const now = new Date();
         
@@ -136,11 +180,14 @@ export const analyticsRouter = createTRPCRouter({
 
         console.log('👥 Date Range:', { 
           startDate: startDate.toISOString(), 
-          endDate: endDate.toISOString() 
+          endDate: endDate.toISOString(),
+          organizationId: organization.id,
         });
 
+        // ✅ Get visitors filtered by organization
         const visitors = await ctx.db.visitor.findMany({
           where: {
+            organizationId: organization.id, // ✅ Filter by organization
             checkInTime: {
               gte: startDate,
               lte: endDate,
@@ -221,6 +268,27 @@ export const analyticsRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       try {
+        // ✅ SECURITY: Require organization context
+        if (!ctx.organizationId) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Organization context is required for analytics.',
+          });
+        }
+
+        // ✅ Get internal organization ID from Clerk orgId
+        const organization = await ctx.db.organization.findUnique({
+          where: { clerkOrgId: ctx.organizationId },
+          select: { id: true },
+        });
+
+        if (!organization) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Organization not found',
+          });
+        }
+
         console.log('📈 Traffic Insights - Input:', input);
         const now = new Date();
         
@@ -235,11 +303,14 @@ export const analyticsRouter = createTRPCRouter({
 
         console.log('📈 Date Range:', { 
           startDate: startDate.toISOString(), 
-          endDate: endDate.toISOString() 
+          endDate: endDate.toISOString(),
+          organizationId: organization.id,
         });
 
+        // ✅ Get visitors filtered by organization
         const visitors = await ctx.db.visitor.findMany({
           where: {
+            organizationId: organization.id, // ✅ Filter by organization
             checkInTime: {
               gte: startDate,
               lte: endDate,
