@@ -6,6 +6,9 @@ import { SidebarProvider } from '@/components/sidebar-context';
 import { db } from '@/server/db';
 import { getUserProfile } from '@/lib/auth-helpers';
 
+// Force dynamic rendering - prevent static analysis
+export const dynamic = 'force-dynamic';
+
 export default async function EmployeeLayout({
   children,
 }: {
