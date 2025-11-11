@@ -25,7 +25,12 @@ export function createMsalClient(): ConfidentialClientApplication {
       clientId,
       clientSecret,
       authority: 'https://login.microsoftonline.com/common',
-      redirectUri,
+    },
+    system: {
+      loggerOptions: {
+        loggerCallback: () => {},
+        piiLoggingEnabled: false,
+      },
     },
   });
 }
@@ -41,8 +46,11 @@ export async function getOutlookAuthUrl(staffId: string): Promise<string> {
     'https://graph.microsoft.com/User.Read',
   ];
 
+  const redirectUri = process.env.OUTLOOK_REDIRECT_URI || `${process.env.NEXT_PUBLIC_APP_URL}/api/calendar/outlook/callback`;
+  
   const authUrl = await msalClient.getAuthCodeUrl({
     scopes,
+    redirectUri,
     state: staffId, // Pass staff ID in state for callback
     prompt: 'consent', // Force consent to get refresh token
   });
@@ -73,9 +81,14 @@ export async function exchangeOutlookCodeForTokens(code: string): Promise<Outloo
   // Calculate expiry time (tokens typically expire in 1 hour)
   const expiresOn = result.expiresOn ? result.expiresOn.getTime() : Date.now() + 3600000;
 
+  // MSAL doesn't provide refresh_token in the same way as OAuth2
+  // We'll need to handle token refresh using MSAL's built-in methods
+  // For now, store the account info which MSAL uses for refresh
+  const refreshToken = result.account?.homeAccountId || result.account?.localAccountId || '';
+  
   return {
     accessToken: result.accessToken,
-    refreshToken: result.account?.idTokenClaims?.refresh_token || '', // Note: MSAL handles refresh differently
+    refreshToken, // Store account ID for token refresh
     expiresOn,
     scope: result.scopes?.join(' ') || '',
   };

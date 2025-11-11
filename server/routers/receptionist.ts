@@ -25,9 +25,20 @@ export const receptionistRouter = createTRPCRouter({
         ? `${clerkUser.firstName} ${clerkUser.lastName}`
         : clerkUser.firstName || clerkUser.username || 'Receptionist';
 
+      // Get organization ID if available
+      let organizationId: string | null = null;
+      if (ctx.organizationId) {
+        const org = await ctx.db.organization.findUnique({
+          where: { clerkOrgId: ctx.organizationId },
+          select: { id: true },
+        });
+        organizationId = org?.id || null;
+      }
+
       receptionist = await ctx.db.receptionist.create({
         data: {
           clerkUserId: ctx.userId,
+          organizationId: organizationId || '', // Receptionist requires organizationId
           fullName,
           email,
           location: 'Main Reception', // Default location, can be updated later

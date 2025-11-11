@@ -76,7 +76,7 @@ export function ITSearch() {
         suggestions.push({
           id: `staff-${s.id}`,
           title: s.fullName,
-          subtitle: s.department || s.title || s.email,
+          subtitle: s.department ?? s.title ?? s.email ?? undefined,
           type: 'staff',
           href: '/it/tickets',
           icon: User,

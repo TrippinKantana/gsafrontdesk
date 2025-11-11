@@ -149,7 +149,6 @@ export const employeeRouter = createTRPCRouter({
         const receptionists = await ctx.db.receptionist.findMany({
           where: {
             organizationId: updatedVisitor.organizationId,
-            clerkUserId: { not: null },
           },
           select: {
             id: true,
@@ -447,7 +446,6 @@ export const employeeRouter = createTRPCRouter({
         const receptionists = await ctx.db.receptionist.findMany({
           where: {
             organizationId: updatedVisitor.organizationId,
-            clerkUserId: { not: null },
           },
           select: {
             id: true,

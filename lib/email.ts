@@ -29,7 +29,7 @@ export interface SendVisitorArrivalEmailParams {
  */
 export async function sendVisitorArrivalEmail(params: SendVisitorArrivalEmailParams) {
   try {
-    const emailHtml = render(
+    const emailHtml = await render(
       VisitorArrivalEmail({
         hostName: params.hostName,
         visitorName: params.visitorName,

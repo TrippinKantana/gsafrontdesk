@@ -52,9 +52,22 @@ export const companyRouter = createTRPCRouter({
           .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
           .join(' ');
 
-        // Check if company exists
-        const existing = await ctx.db.companySuggestion.findUnique({
-          where: { name: capitalizedName },
+        // Get organization ID if available
+        let organizationId: string | null = null;
+        if (ctx.organizationId) {
+          const org = await ctx.db.organization.findUnique({
+            where: { clerkOrgId: ctx.organizationId },
+            select: { id: true },
+          });
+          organizationId = org?.id || null;
+        }
+
+        // Check if company exists (using organizationId_name compound unique)
+        const existing = await ctx.db.companySuggestion.findFirst({
+          where: { 
+            name: capitalizedName,
+            organizationId: organizationId,
+          },
         });
 
         if (existing) {
@@ -72,6 +85,7 @@ export const companyRouter = createTRPCRouter({
             data: {
               name: capitalizedName,
               normalizedName,
+              organizationId: organizationId,
               useCount: 1,
               lastUsed: new Date(),
             },

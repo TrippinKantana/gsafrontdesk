@@ -35,7 +35,22 @@ export async function getUserProfile(): Promise<UserProfile | null> {
       },
     });
 
-    return staff;
+    if (!staff) return null;
+    
+    // Ensure role matches UserRole type
+    const role = staff.role as UserRole;
+    if (!['Employee', 'Receptionist', 'Admin', 'IT Staff'].includes(role)) {
+      return null;
+    }
+    
+    return {
+      id: staff.id,
+      fullName: staff.fullName,
+      email: staff.email,
+      role,
+      department: staff.department,
+      title: staff.title,
+    };
   } catch (error) {
     console.error('Error fetching user profile:', error);
     return null;
