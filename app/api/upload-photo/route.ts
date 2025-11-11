@@ -12,14 +12,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    // Convert File to Blob for UploadThing
-    const arrayBuffer = await file.arrayBuffer();
-    const blob = new Blob([arrayBuffer], { type: file.type });
-
     // Upload to UploadThing using UTApi
-    const uploadResult = await utapi.uploadFiles(blob, {
-      name: file.name,
+    // Read the file buffer and create a proper File object
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    
+    // Create a File object that UploadThing expects
+    const fileForUpload = new File([buffer], file.name, {
+      type: file.type,
+      lastModified: file.lastModified || Date.now(),
     });
+
+    const uploadResult = await utapi.uploadFiles(fileForUpload);
 
     if (!uploadResult || !uploadResult.url) {
       return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
