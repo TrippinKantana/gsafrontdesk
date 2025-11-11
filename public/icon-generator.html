@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Icon Generator - Front Desk</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #f3f4f6;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 600px;
+        }
+        h1 { color: #1f2937; margin-top: 0; }
+        canvas { display: none; }
+        .preview {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin: 30px 0;
+        }
+        .preview-item {
+            text-align: center;
+        }
+        .preview-item img {
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #2563eb; }
+        .instructions {
+            text-align: left;
+            background: #f9fafb;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .instructions ol {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 Front Desk PWA Icon Generator</h1>
+        <p>Generate icons for your Progressive Web App</p>
+        
+        <div class="preview">
+            <div class="preview-item">
+                <img id="preview192" width="96" height="96" alt="192x192 preview">
+                <p>192x192</p>
+            </div>
+            <div class="preview-item">
+                <img id="preview512" width="128" height="128" alt="512x512 preview">
+                <p>512x512</p>
+            </div>
+        </div>
+        
+        <button onclick="generateIcons()">Generate Icons</button>
+        <button onclick="download192()">Download 192x192</button>
+        <button onclick="download512()">Download 512x512</button>
+        
+        <div class="instructions">
+            <h3>📋 Instructions:</h3>
+            <ol>
+                <li>Click "Generate Icons" to create placeholder icons</li>
+                <li>Click "Download 192x192" and "Download 512x512" to save both files</li>
+                <li>Save the downloaded files as:
+                    <ul>
+                        <li><code>icon-192.png</code></li>
+                        <li><code>icon-512.png</code></li>
+                    </ul>
+                </li>
+                <li>Place both files in your <code>public/</code> folder</li>
+                <li>Restart your dev server</li>
+                <li>The PWA install prompt will now appear!</li>
+            </ol>
+            <p><strong>Pro Tip:</strong> For production, replace these with custom icons designed with your branding.</p>
+        </div>
+        
+        <canvas id="canvas192" width="192" height="192"></canvas>
+        <canvas id="canvas512" width="512" height="512"></canvas>
+    </div>
+
+    <script>
+        function drawIcon(canvas, size) {
+            const ctx = canvas.getContext('2d');
+            
+            // Background gradient
+            const gradient = ctx.createLinearGradient(0, 0, size, size);
+            gradient.addColorStop(0, '#3b82f6');
+            gradient.addColorStop(1, '#1e40af');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, size, size);
+            
+            // Text
+            ctx.fillStyle = 'white';
+            ctx.font = `bold ${size * 0.15}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('FRONT', size / 2, size / 2 - size * 0.08);
+            ctx.fillText('DESK', size / 2, size / 2 + size * 0.08);
+            
+            // Icon (simple door shape)
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = size * 0.02;
+            ctx.strokeRect(size * 0.35, size * 0.25, size * 0.3, size * 0.4);
+            ctx.fillStyle = 'white';
+            ctx.fillRect(size * 0.6, size * 0.43, size * 0.03, size * 0.04);
+        }
+        
+        function generateIcons() {
+            const canvas192 = document.getElementById('canvas192');
+            const canvas512 = document.getElementById('canvas512');
+            
+            drawIcon(canvas192, 192);
+            drawIcon(canvas512, 512);
+            
+            document.getElementById('preview192').src = canvas192.toDataURL();
+            document.getElementById('preview512').src = canvas512.toDataURL();
+            
+            alert('Icons generated! Now download both files.');
+        }
+        
+        function download192() {
+            const canvas = document.getElementById('canvas192');
+            const link = document.createElement('a');
+            link.download = 'icon-192.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+        
+        function download512() {
+            const canvas = document.getElementById('canvas512');
+            const link = document.createElement('a');
+            link.download = 'icon-512.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+        
+        // Auto-generate on load
+        window.onload = generateIcons;
+    </script>
+</body>
+</html>
+

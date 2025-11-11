@@ -1,0 +1,397 @@
+// Multi-Tenant Prisma Schema with Clerk Organizations
+// This schema adds organizationId to all relevant tables for data isolation
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Organization model (synced with Clerk Organizations)
+model Organization {
+  id         String @id @default(cuid())
+  clerkOrgId String @unique // Clerk organization ID
+  name       String
+  slug       String @unique // URL-friendly identifier
+
+  // Subscription info (for future SaaS features)
+  plan        String @default("free") // free, starter, professional, enterprise
+  maxStaff    Int    @default(10) // Limit based on plan
+  maxVisitors Int    @default(1000) // Monthly limit
+
+  // Branding (white-label)
+  logoUrl        String?
+  primaryColor   String  @default("#3b82f6")
+  secondaryColor String  @default("#10b981")
+
+  // Contact info
+  email   String?
+  phone   String?
+  address String?
+  website String?
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  staff         Staff[]
+  visitors      Visitor[]
+  meetings      Meeting[]
+  tickets       Ticket[]
+  receptionists Receptionist[]
+
+  @@map("organizations")
+}
+
+model Receptionist {
+  id             String       @id @default(cuid())
+  clerkUserId    String       @unique
+  organizationId String // Multi-tenant field
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  fullName String
+  email    String
+  location String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  visitors Visitor[]
+
+  @@index([organizationId])
+  @@map("receptionists")
+}
+
+model Staff {
+  id             String       @id @default(cuid())
+  organizationId String // Multi-tenant field
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  fullName   String
+  email      String?
+  phone      String?
+  department String?
+  title      String?
+  isActive   Boolean @default(true)
+
+  // Authentication
+  canLogin    Boolean @default(false)
+  clerkUserId String? @unique
+  username    String? @unique
+
+  // Role within organization
+  role String @default("Employee") // Employee, Receptionist, Admin, IT Staff
+
+  // Notification preferences
+  notifyEmail            Boolean @default(true)
+  notifySMS              Boolean @default(false)
+  notifyOnVisitorArrival Boolean @default(true)
+
+  // Calendar Integration
+  googleCalendarConnected     Boolean @default(false)
+  googleCalendarToken         String? @db.Text // Encrypted OAuth token (JSON)
+  googleCalendarRefreshToken  String? @db.Text // Encrypted refresh token
+  outlookCalendarConnected    Boolean @default(false)
+  outlookCalendarToken        String? @db.Text // Encrypted OAuth token (JSON)
+  outlookCalendarRefreshToken String? @db.Text // Encrypted refresh token
+  customCalendarUrl           String? // For custom calendar (iCal/CalDAV)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  meetings        Meeting[]
+  hostedVisitors  Visitor[]       @relation("HostedBy")
+  createdTickets  Ticket[]        @relation("TicketCreator")
+  assignedTickets Ticket[]        @relation("TicketAssignee")
+  ticketMessages  TicketMessage[]
+  notifications   Notification[]
+
+  @@index([organizationId])
+  @@index([organizationId, role])
+  @@index([clerkUserId])
+  @@map("staff")
+}
+
+model Visitor {
+  id             String       @id @default(cuid())
+  organizationId String // Multi-tenant field
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  fullName  String
+  company   String // Company, branch, organization, or location
+  email     String
+  phone     String
+  photoUrl  String?
+  whomToSee String // Staff member name
+
+  // Host relationship
+  hostStaffId String?
+  hostStaff   Staff?  @relation("HostedBy", fields: [hostStaffId], references: [id], onDelete: SetNull)
+
+  reasonForVisit String? // Meeting, Delivery, Interview, Service, Other
+  visitorType    String  @default("Client") // Client, Vendor, Interview, Delivery, Other
+
+  checkInTime  DateTime  @default(now())
+  checkOutTime DateTime?
+
+  // Meeting integration
+  meetingId String?  @unique
+  meeting   Meeting? @relation(fields: [meetingId], references: [id], onDelete: SetNull)
+
+  // Host response
+  hostResponseStatus String? // pending, accepted, declined
+  hostResponseTime   DateTime?
+  hostResponseNote   String?
+
+  receptionistId String?
+  receptionist   Receptionist? @relation(fields: [receptionistId], references: [id], onDelete: SetNull)
+
+  checkInLogs   CheckInLog[]
+  notifications VisitorNotification[]
+
+  @@index([organizationId])
+  @@index([organizationId, checkInTime])
+  @@map("visitors")
+}
+
+model CheckInLog {
+  id        String   @id @default(cuid())
+  visitorId String
+  visitor   Visitor  @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+  status    String // CHECKED_IN, CHECKED_OUT
+  timestamp DateTime @default(now())
+
+  @@map("check_in_logs")
+}
+
+model Meeting {
+  id             String       @id @default(cuid())
+  organizationId String // Multi-tenant field
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String?
+
+  // Date and time
+  startTime DateTime
+  endTime   DateTime
+
+  // Location
+  location String? // Meeting room, building, etc.
+
+  // Host (employee)
+  hostId String
+  host   Staff  @relation(fields: [hostId], references: [id], onDelete: Cascade)
+
+  // Attendees
+  expectedVisitors String[] // Array of visitor names or emails
+
+  // Status
+  status String @default("scheduled") // scheduled, in-progress, completed, cancelled
+
+  // Integration
+  googleCalendarEventId  String?
+  outlookCalendarEventId String?
+
+  // Notes
+  notes String?
+
+  // Visitor link (when visitor checks in)
+  visitor Visitor?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([organizationId, hostId, startTime])
+  @@index([startTime, endTime])
+  @@map("meetings")
+}
+
+model VisitorNotification {
+  id        String  @id @default(cuid())
+  visitorId String
+  visitor   Visitor @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+
+  recipientType  String // email, sms
+  recipientValue String // email address or phone number
+
+  status      String    @default("pending") // pending, sent, failed, delivered
+  sentAt      DateTime?
+  deliveredAt DateTime?
+
+  messageType    String // check-in, check-out, meeting-reminder
+  messageContent String? @db.Text
+
+  errorMessage String?
+
+  createdAt DateTime @default(now())
+
+  @@index([visitorId])
+  @@index([status])
+  @@map("visitor_notifications")
+}
+
+// Company/Organization auto-suggestions (per organization)
+model CompanySuggestion {
+  id             String  @id @default(cuid())
+  organizationId String? // Optional: can be shared across orgs or per-org
+
+  name           String
+  normalizedName String // lowercase, trimmed for matching
+  useCount       Int    @default(1) // Track frequency
+
+  lastUsed  DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@unique([organizationId, name]) // Unique per organization
+  @@index([organizationId, normalizedName])
+  @@index([useCount])
+  @@map("company_suggestions")
+}
+
+// IT Support Ticket System
+model Ticket {
+  id             String       @id @default(cuid())
+  organizationId String // Multi-tenant field
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  ticketNumber String @unique // Auto-generated ticket ID (e.g., TKT-20231105-001)
+
+  // Ticket Details
+  title       String
+  description String  @db.Text
+  priority    String  @default("Medium") // Low, Medium, High, Critical
+  status      String  @default("Open") // Open, In Progress, Resolved, Closed
+  category    String? // Hardware, Software, Network, Access, Other
+
+  // Creator (requester)
+  createdById String
+  createdBy   Staff  @relation("TicketCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  // Assignee (IT Staff)
+  assignedToId String?
+  assignedTo   Staff?  @relation("TicketAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  // Resolution
+  resolutionNotes String?   @db.Text
+  resolvedAt      DateTime?
+  closedAt        DateTime?
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  messages    TicketMessage[]
+  attachments TicketAttachment[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([organizationId, createdById])
+  @@index([organizationId, assignedToId])
+  @@index([priority])
+  @@index([createdAt])
+  @@map("tickets")
+}
+
+model TicketMessage {
+  id       String @id @default(cuid())
+  ticketId String
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  // Message sender
+  senderId String
+  sender   Staff  @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  // Message content
+  message    String  @db.Text
+  isInternal Boolean @default(false) // Internal notes only visible to IT staff
+
+  createdAt DateTime @default(now())
+
+  @@index([ticketId])
+  @@index([createdAt])
+  @@map("ticket_messages")
+}
+
+model TicketAttachment {
+  id       String @id @default(cuid())
+  ticketId String
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  fileName     String
+  fileUrl      String
+  fileSize     Int // in bytes
+  fileType     String // MIME type
+  uploadedById String // Reference to staff who uploaded
+
+  createdAt DateTime @default(now())
+
+  @@index([ticketId])
+  @@map("ticket_attachments")
+}
+
+model TicketNotification {
+  id       String @id @default(cuid())
+  ticketId String
+
+  recipientEmail   String
+  notificationType String // new_ticket, status_update, new_message, ticket_assigned, ticket_resolved
+
+  status String    @default("pending") // pending, sent, failed
+  sentAt DateTime?
+
+  emailSubject String?
+  emailBody    String? @db.Text
+  errorMessage String?
+
+  createdAt DateTime @default(now())
+
+  @@index([ticketId])
+  @@index([status])
+  @@map("ticket_notifications")
+}
+
+// In-App Notifications (for user dashboard notifications)
+model Notification {
+  id             String @id @default(cuid())
+  organizationId String
+
+  // Recipient
+  userId  String // Clerk user ID
+  staffId String? // Reference to Staff if applicable
+  staff   Staff?  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  // Notification details
+  type    String // visitor_response, ticket_assigned, ticket_updated, meeting_scheduled, etc.
+  title   String
+  message String @db.Text
+
+  // Related entities (optional, for linking)
+  relatedId   String? // ID of related entity (visitor, ticket, meeting, etc.)
+  relatedType String? // Type of related entity (visitor, ticket, meeting)
+  actionUrl   String? // URL to navigate to when clicked
+
+  // Status
+  isRead Boolean   @default(false)
+  readAt DateTime?
+
+  // Metadata
+  metadata Json? // Additional data as needed
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([staffId])
+  @@index([organizationId])
+  @@index([isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
