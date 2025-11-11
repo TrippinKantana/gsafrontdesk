@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { exchangeCalendarCodeForTokens } from '@/lib/calendar';
 import { db } from '@/server/db';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 /**
  * Google Calendar OAuth Callback
  * Handles the OAuth redirect from Google after user authorization
