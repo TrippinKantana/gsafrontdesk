@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { db } from '@/server/db';
 
-// Force dynamic rendering
+// Force dynamic rendering - prevent static analysis
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+export const fetchCache = 'force-no-store';
 
 /**
  * Disconnect calendar

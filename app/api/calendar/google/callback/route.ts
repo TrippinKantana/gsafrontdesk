@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { exchangeCalendarCodeForTokens } from '@/lib/calendar';
 import { db } from '@/server/db';
 
-// Force dynamic rendering
+// Force dynamic rendering - prevent static analysis
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+export const fetchCache = 'force-no-store';
 
 /**
  * Google Calendar OAuth Callback
