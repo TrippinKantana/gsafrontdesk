@@ -20,7 +20,6 @@ const isPublicRoute = createRouteMatcher([
   "/api/trpc/company.getSuggestions",
   "/api/trpc/employee.respondToVisitor",
   "/api/trpc/employee.getProfile",
-  "/api/uploadthing(.*)",
 ]);
 
 // Protected routes that require authentication
