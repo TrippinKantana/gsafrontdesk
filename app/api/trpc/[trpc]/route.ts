@@ -2,6 +2,10 @@ import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
 import { appRouter } from '@/server/routers/_app';
 import { createTRPCContext } from '@/server/trpc';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 export async function GET(req: Request) {
   return fetchRequestHandler({
     endpoint: '/api/trpc',
