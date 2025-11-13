@@ -21,12 +21,93 @@ export default async function DashboardLayout({
     redirect('/sign-in');
   }
 
+  // ✅ Sync organization from Clerk to database FIRST (needed for profile creation)
+  let organization: { id: string } | null = null;
+  if (orgId) {
+    try {
+      const clerk = await clerkClient();
+      const clerkOrg = await clerk.organizations.getOrganization({ organizationId: orgId });
+      
+      // Upsert ensures organization exists in DB and name is always synced from Clerk
+      const syncedOrg = await db.organization.upsert({
+        where: { clerkOrgId: orgId },
+        create: {
+          clerkOrgId: orgId,
+          name: clerkOrg.name,
+          slug: clerkOrg.slug || orgId,
+        },
+        update: {
+          name: clerkOrg.name,
+          slug: clerkOrg.slug || orgId,
+        },
+      });
+      
+      organization = { id: syncedOrg.id };
+      console.log('[Dashboard Layout] ✅ Organization synced:', clerkOrg.name);
+    } catch (error) {
+      console.error('[Dashboard Layout] ❌ Failed to sync organization:', error);
+    }
+  }
+
   // ✅ SECURITY: Check user role server-side before rendering admin dashboard
   // Redirect unauthorized users (Employee, IT Staff) to their correct dashboards
-  const userProfile = await getUserProfile();
+  let userProfile = await getUserProfile();
   
-  // If user profile doesn't exist, redirect to waiting page
-  // User profiles must be created by an admin in the staff management interface
+  // If user profile doesn't exist, check if user is organization admin
+  // If they are an org admin, auto-create their Admin profile
+  if (!userProfile && orgId && organization) {
+    try {
+      const clerk = await clerkClient();
+      
+      // Check if user is an organization admin in Clerk
+      // Get user's memberships and find the one for this organization
+      const memberships = await clerk.users.getOrganizationMembershipList({ userId });
+      const orgMembership = memberships.data.find(
+        (m) => m.organization.id === orgId
+      );
+      
+      const isOrgAdmin = orgMembership?.role === 'org:admin' || orgMembership?.role === 'org:creator';
+      
+      if (isOrgAdmin) {
+        console.log('[Dashboard Layout] 🎯 User is org admin but no profile - auto-creating Admin profile');
+        
+        // Get user info from Clerk
+        const clerkUser = await clerk.users.getUser(userId);
+        const fullName = clerkUser.firstName && clerkUser.lastName
+          ? `${clerkUser.firstName} ${clerkUser.lastName}`
+          : clerkUser.username || clerkUser.emailAddresses[0]?.emailAddress || 'Admin User';
+        
+        // Auto-create Admin staff profile for organization creator
+        const newStaff = await db.staff.create({
+          data: {
+            organizationId: organization.id,
+            fullName: fullName,
+            email: clerkUser.emailAddresses[0]?.emailAddress || null,
+            role: 'Admin',
+            canLogin: true,
+            clerkUserId: userId,
+            isActive: true,
+          },
+        });
+        
+        console.log('[Dashboard Layout] ✅ Auto-created Admin profile:', newStaff.id);
+        
+        // Fetch the newly created profile
+        userProfile = {
+          id: newStaff.id,
+          fullName: newStaff.fullName,
+          email: newStaff.email,
+          role: 'Admin' as const,
+          department: newStaff.department,
+          title: newStaff.title,
+        };
+      }
+    } catch (error) {
+      console.error('[Dashboard Layout] ❌ Error auto-creating admin profile:', error);
+    }
+  }
+  
+  // If still no profile after auto-creation attempt, redirect to waiting page
   if (!userProfile) {
     console.log('[Dashboard Layout] ⚠️ User profile not found for userId:', userId, '- redirecting to waiting-for-setup');
     redirect('/waiting-for-setup');
@@ -39,32 +120,6 @@ export default async function DashboardLayout({
     redirect('/it/dashboard');
   }
   // Admin and Receptionist can proceed
-
-  // ✅ Sync organization from Clerk to database if present
-  if (orgId) {
-    try {
-      const clerk = await clerkClient();
-      const organization = await clerk.organizations.getOrganization({ organizationId: orgId });
-      
-      // Upsert ensures organization exists in DB and name is always synced from Clerk
-      await db.organization.upsert({
-        where: { clerkOrgId: orgId },
-        create: {
-          clerkOrgId: orgId,
-          name: organization.name,
-          slug: organization.slug || orgId,
-        },
-        update: {
-          name: organization.name,
-          slug: organization.slug || orgId,
-        },
-      });
-      
-      console.log('[Dashboard Layout] ✅ Organization synced:', organization.name);
-    } catch (error) {
-      console.error('[Dashboard Layout] ❌ Failed to sync organization:', error);
-    }
-  }
   // Note: Client-side components handle organization context via useAuth()
 
   return (
