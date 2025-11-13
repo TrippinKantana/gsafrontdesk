@@ -78,8 +78,6 @@ export default async function DashboardLayout({
       // Check if user is an organization admin in Clerk (reuse the membership from above)
       const isOrgAdmin = orgMembership.role === 'org:admin' || orgMembership.role === 'org:creator';
       
-      const isOrgAdmin = orgMembership?.role === 'org:admin' || orgMembership?.role === 'org:creator';
-      
       if (isOrgAdmin) {
         console.log('[Dashboard Layout] 🎯 User is org admin but no profile - auto-creating Admin profile');
         
