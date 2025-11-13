@@ -10,6 +10,7 @@ import { CheckCircle2, ArrowLeft, Search, LogOut } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import Link from 'next/link';
 import { formatDate } from '@/lib/utils';
+import { CheckoutConfirmDialog } from '@/components/checkout-confirm-dialog';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -18,6 +19,14 @@ export default function CheckoutPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [pendingCheckout, setPendingCheckout] = useState<{
+    type: 'single' | 'bulk';
+    visitorId?: string;
+    visitorName?: string;
+    companyName?: string;
+    visitorCount?: number;
+  } | null>(null);
   const { toast } = useToast();
 
   // Search for visitors
@@ -39,6 +48,8 @@ export default function CheckoutPage() {
       if (searchQuery) {
         refetchSearch();
       }
+      setConfirmDialogOpen(false);
+      setPendingCheckout(null);
     },
     onError: (error) => {
       toast({
@@ -46,6 +57,8 @@ export default function CheckoutPage() {
         description: error.message || 'Failed to check out. Please try again.',
         variant: 'destructive',
       });
+      setConfirmDialogOpen(false);
+      setPendingCheckout(null);
     },
   });
 
@@ -68,9 +81,12 @@ export default function CheckoutPage() {
   };
 
   const handleCheckout = (visitorId: string, visitorName: string) => {
-    if (confirm(`Are you sure you want to check out ${visitorName}?`)) {
-      checkoutMutation.mutate({ id: visitorId });
-    }
+    setPendingCheckout({
+      type: 'single',
+      visitorId,
+      visitorName,
+    });
+    setConfirmDialogOpen(true);
   };
 
   const handleCheckoutAll = (companyName: string) => {
@@ -78,7 +94,24 @@ export default function CheckoutPage() {
       v.company.toLowerCase() === companyName.toLowerCase()
     );
     
-    if (confirm(`Are you sure you want to check out all ${companyVisitors.length} visitor(s) from ${companyName}?`)) {
+    setPendingCheckout({
+      type: 'bulk',
+      companyName,
+      visitorCount: companyVisitors.length,
+    });
+    setConfirmDialogOpen(true);
+  };
+
+  const handleConfirmCheckout = () => {
+    if (!pendingCheckout) return;
+
+    if (pendingCheckout.type === 'single' && pendingCheckout.visitorId) {
+      checkoutMutation.mutate({ id: pendingCheckout.visitorId });
+    } else if (pendingCheckout.type === 'bulk' && pendingCheckout.companyName) {
+      const companyVisitors = searchResults.filter((v) => 
+        v.company.toLowerCase() === pendingCheckout.companyName!.toLowerCase()
+      );
+      
       // Check out all visitors from the company
       Promise.all(
         companyVisitors.map((visitor) =>
@@ -87,15 +120,19 @@ export default function CheckoutPage() {
       ).then(() => {
         toast({
           title: 'All checked out!',
-          description: `Successfully checked out ${companyVisitors.length} visitor(s) from ${companyName}.`,
+          description: `Successfully checked out ${companyVisitors.length} visitor(s) from ${pendingCheckout.companyName}.`,
         });
         refetchSearch();
+        setConfirmDialogOpen(false);
+        setPendingCheckout(null);
       }).catch((error) => {
         toast({
           title: 'Error',
           description: 'Some checkouts failed. Please try again.',
           variant: 'destructive',
         });
+        setConfirmDialogOpen(false);
+        setPendingCheckout(null);
       });
     }
   };

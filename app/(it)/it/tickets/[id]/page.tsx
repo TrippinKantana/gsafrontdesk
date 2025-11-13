@@ -17,10 +17,17 @@ import {
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
-import { Clock, ArrowLeft, Send, CheckCircle, XCircle, User } from 'lucide-react';
+import { Clock, ArrowLeft, Send, CheckCircle, XCircle, User, UserPlus } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import Link from 'next/link';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function TicketDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -32,10 +39,12 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
     status: 'Open' | 'In Progress' | 'Resolved' | 'Closed' | '';
     priority: 'Low' | 'Medium' | 'High' | 'Critical' | '';
     resolutionNotes: string;
+    assignedToId: string | null;
   }>({
     status: '',
     priority: '',
     resolutionNotes: '',
+    assignedToId: null,
   });
 
   // Fetch ticket details
@@ -43,6 +52,11 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
     { id: params.id },
     { refetchInterval: 10000 }
   );
+
+  // Fetch IT staff for assignment
+  const { data: itStaff = [] } = trpc.staff.getAll.useQuery(undefined, {
+    select: (staff) => staff.filter((s) => s.role === 'IT Staff' || s.role === 'Admin'),
+  });
 
   // Add message mutation
   const addMessage = trpc.ticket.addMessage.useMutation({
@@ -84,6 +98,14 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
       status: (updateForm.status || undefined) as 'Open' | 'In Progress' | 'Resolved' | 'Closed' | undefined,
       priority: (updateForm.priority || undefined) as 'Low' | 'Medium' | 'High' | 'Critical' | undefined,
       resolutionNotes: updateForm.resolutionNotes || undefined,
+      assignedToId: updateForm.assignedToId || null,
+    });
+  };
+
+  const handleAssignTicket = (staffId: string | null) => {
+    updateTicket.mutate({
+      id: params.id,
+      assignedToId: staffId,
     });
   };
 
@@ -93,6 +115,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
         status: ticket.status as 'Open' | 'In Progress' | 'Resolved' | 'Closed' | '',
         priority: ticket.priority as 'Low' | 'Medium' | 'High' | 'Critical' | '',
         resolutionNotes: ticket.resolutionNotes || '',
+        assignedToId: ticket.assignedToId || null,
       });
     }
     setIsUpdateDialogOpen(true);
@@ -276,8 +299,26 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
               </div>
 
               <div>
-                <p className="text-gray-600 font-medium">Assigned To</p>
-                <p className="text-gray-900">{ticket.assignedTo ? ticket.assignedTo.fullName : 'Unassigned'}</p>
+                <p className="text-gray-600 font-medium mb-2">Assigned To</p>
+                <Select
+                  value={ticket.assignedToId || 'unassigned'}
+                  onValueChange={(value) => handleAssignTicket(value === 'unassigned' ? null : value)}
+                  disabled={updateTicket.isPending}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select IT staff">
+                      {ticket.assignedTo ? ticket.assignedTo.fullName : 'Unassigned'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {itStaff.map((staff) => (
+                      <SelectItem key={staff.id} value={staff.id}>
+                        {staff.fullName} {staff.email ? `(${staff.email})` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {ticket.category && (
@@ -352,6 +393,30 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                 <option value="High">High</option>
                 <option value="Critical">Critical</option>
               </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="assignedTo">Assign To</Label>
+              <Select
+                value={updateForm.assignedToId || 'unassigned'}
+                onValueChange={(value) => setUpdateForm({ ...updateForm, assignedToId: value === 'unassigned' ? null : value })}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select IT staff">
+                    {updateForm.assignedToId
+                      ? itStaff.find((s) => s.id === updateForm.assignedToId)?.fullName || 'Unassigned'
+                      : 'Unassigned'}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                  {itStaff.map((staff) => (
+                    <SelectItem key={staff.id} value={staff.id}>
+                      {staff.fullName} {staff.email ? `(${staff.email})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {(updateForm.status === 'Resolved' || updateForm.status === 'Closed') && (

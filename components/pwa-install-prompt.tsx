@@ -24,9 +24,6 @@ export function PWAInstallPrompt() {
     // Check if already installed
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    
-    // Check if user has dismissed before (using localStorage)
-    const hasDismissed = localStorage.getItem('pwa-install-dismissed') === 'true';
     const hasInstalled = localStorage.getItem('pwa-installed') === 'true';
     
     if (isStandalone || hasInstalled) {
@@ -34,11 +31,29 @@ export function PWAInstallPrompt() {
       return;
     }
 
+    // Check if user has dismissed before and if 24 hours have passed
+    const shouldShowPrompt = () => {
+      const dismissedTimestamp = localStorage.getItem('pwa-install-dismissed-timestamp');
+      
+      if (!dismissedTimestamp) {
+        // Never dismissed, show prompt
+        return true;
+      }
+      
+      // Check if 24 hours (86400000 ms) have passed since last dismissal
+      const dismissedTime = parseInt(dismissedTimestamp, 10);
+      const now = Date.now();
+      const hoursSinceDismissal = (now - dismissedTime) / (1000 * 60 * 60);
+      
+      // Show again if more than 24 hours have passed
+      return hoursSinceDismissal >= 24;
+    };
+
     const handler = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
-      // Show prompt immediately for first-time visitors (unless dismissed)
-      if (!hasDismissed) {
+      // Show prompt if it should be shown (first time or 24+ hours since dismissal)
+      if (shouldShowPrompt()) {
         setTimeout(() => {
           setShowPrompt(true);
         }, 2000); // Show after 2 seconds
@@ -47,8 +62,8 @@ export function PWAInstallPrompt() {
 
     window.addEventListener('beforeinstallprompt', handler);
 
-    // For iOS, show a custom message after a delay
-    if (isIOS && !hasDismissed) {
+    // For iOS, show a custom message after a delay (if should show)
+    if (isIOS && shouldShowPrompt()) {
       setTimeout(() => {
         if (!isStandalone && !hasInstalled) {
           setShowPrompt(true);
@@ -86,7 +101,8 @@ export function PWAInstallPrompt() {
 
   const handleDismiss = () => {
     setShowPrompt(false);
-    localStorage.setItem('pwa-install-dismissed', 'true');
+    // Store timestamp of dismissal (will show again after 24 hours)
+    localStorage.setItem('pwa-install-dismissed-timestamp', Date.now().toString());
   };
 
   // Show for iOS even without beforeinstallprompt

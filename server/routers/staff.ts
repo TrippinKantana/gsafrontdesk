@@ -151,9 +151,7 @@ export const staffRouter = createTRPCRouter({
             lastName: input.fullName.split(' ').slice(1).join(' ') || undefined,
             skipPasswordChecks: true, // Skip password strength requirements
             skipPasswordRequirement: false,
-            unsafeMetadata: {
-              legal_accepted_at: new Date().toISOString(),
-            },
+            legalAcceptedAt: new Date().toISOString(), // Required when "Require express consent to legal documents" is enabled in Clerk
           });
 
           clerkUserId = clerkUser.id;
@@ -352,24 +350,37 @@ export const staffRouter = createTRPCRouter({
         });
       }
       
+      // ✅ Look up organization by Clerk ID to get internal database ID
+      const organization = await ctx.db.organization.findUnique({
+        where: { clerkOrgId: ctx.organizationId },
+        select: { id: true },
+      });
+
+      if (!organization) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Organization not found in database',
+        });
+      }
+      
       const existingStaff = await ctx.db.staff.findUnique({
         where: { 
           id: input.id,
         },
       });
-      
-      // ✅ Verify staff belongs to this organization
-      if (existingStaff?.organizationId !== ctx.organizationId) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Staff member not found in your organization',
-        });
-      }
 
       if (!existingStaff) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Staff member not found',
+        });
+      }
+      
+      // ✅ Verify staff belongs to this organization (compare database IDs)
+      if (existingStaff.organizationId !== organization.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Staff member not found in your organization',
         });
       }
 
@@ -398,9 +409,7 @@ export const staffRouter = createTRPCRouter({
             lastName: input.fullName.split(' ').slice(1).join(' ') || undefined,
             skipPasswordChecks: true, // Skip password strength requirements
             skipPasswordRequirement: false,
-            unsafeMetadata: {
-              legal_accepted_at: new Date().toISOString(),
-            },
+            legalAcceptedAt: new Date().toISOString(), // Required when "Require express consent to legal documents" is enabled in Clerk
           });
 
           clerkUserId = clerkUser.id;
