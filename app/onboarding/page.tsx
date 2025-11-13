@@ -15,7 +15,10 @@ export default function OnboardingPage() {
   const syncOrg = trpc.organization.syncOrganization.useMutation();
   
   useEffect(() => {
-    if (isLoaded && organization) {
+    // Only run once when organization is loaded
+    if (!isLoaded) return;
+    
+    if (organization) {
       console.log('Syncing organization:', organization.name);
       
       syncOrg.mutate({
@@ -36,11 +39,12 @@ export default function OnboardingPage() {
           router.replace('/dashboard');
         },
       });
-    } else if (isLoaded && !organization) {
+    } else {
       // No organization - redirect to dashboard anyway
       router.replace('/dashboard');
     }
-  }, [isLoaded, organization, syncOrg, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded, organization?.id]); // Only depend on isLoaded and organization.id (stable reference)
   
   // Show minimal loading state while syncing - redirect happens immediately after
   return (

@@ -21,32 +21,44 @@ export default async function DashboardLayout({
     redirect('/sign-in');
   }
 
-  // ✅ Sync organization from Clerk to database FIRST (needed for profile creation)
-  let organization: { id: string } | null = null;
-  if (orgId) {
-    try {
-      const clerk = await clerkClient();
-      const clerkOrg = await clerk.organizations.getOrganization({ organizationId: orgId });
+  // ✅ Get user's organizations from Clerk (even if not active in session)
+  const clerk = await clerkClient();
+  let activeOrgId = orgId;
+  let organization: { id: string; clerkOrgId: string } | null = null;
+
+  try {
+    // If no orgId in session, try to get user's organizations
+    if (!orgId) {
+      const memberships = await clerk.users.getOrganizationMembershipList({ userId });
+      if (memberships.data.length > 0) {
+        // Use the first organization (or the one they created)
+        activeOrgId = memberships.data[0].organization.id;
+        console.log('[Dashboard Layout] No active org in session, using first org:', activeOrgId);
+      }
+    }
+
+    if (activeOrgId) {
+      const clerkOrg = await clerk.organizations.getOrganization({ organizationId: activeOrgId });
       
       // Upsert ensures organization exists in DB and name is always synced from Clerk
       const syncedOrg = await db.organization.upsert({
-        where: { clerkOrgId: orgId },
+        where: { clerkOrgId: activeOrgId },
         create: {
-          clerkOrgId: orgId,
+          clerkOrgId: activeOrgId,
           name: clerkOrg.name,
-          slug: clerkOrg.slug || orgId,
+          slug: clerkOrg.slug || activeOrgId,
         },
         update: {
           name: clerkOrg.name,
-          slug: clerkOrg.slug || orgId,
+          slug: clerkOrg.slug || activeOrgId,
         },
       });
       
-      organization = { id: syncedOrg.id };
+      organization = { id: syncedOrg.id, clerkOrgId: syncedOrg.clerkOrgId };
       console.log('[Dashboard Layout] ✅ Organization synced:', clerkOrg.name);
-    } catch (error) {
-      console.error('[Dashboard Layout] ❌ Failed to sync organization:', error);
     }
+  } catch (error) {
+    console.error('[Dashboard Layout] ❌ Failed to sync organization:', error);
   }
 
   // ✅ SECURITY: Check user role server-side before rendering admin dashboard
@@ -55,15 +67,13 @@ export default async function DashboardLayout({
   
   // If user profile doesn't exist, check if user is organization admin
   // If they are an org admin, auto-create their Admin profile
-  if (!userProfile && orgId && organization) {
+  if (!userProfile && activeOrgId && organization) {
     try {
-      const clerk = await clerkClient();
-      
       // Check if user is an organization admin in Clerk
       // Get user's memberships and find the one for this organization
       const memberships = await clerk.users.getOrganizationMembershipList({ userId });
       const orgMembership = memberships.data.find(
-        (m) => m.organization.id === orgId
+        (m) => m.organization.id === activeOrgId
       );
       
       const isOrgAdmin = orgMembership?.role === 'org:admin' || orgMembership?.role === 'org:creator';
