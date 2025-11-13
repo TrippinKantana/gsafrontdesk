@@ -25,14 +25,19 @@ The main Netlify configuration file that specifies:
    - Framework: Next.js (auto-detected)
 
 3. **Set Environment Variables:**
+   ⚠️ **CRITICAL**: See [NETLIFY_ENV_SETUP.md](./NETLIFY_ENV_SETUP.md) for detailed instructions.
+   
+   **Most Important**: Update `NEXT_PUBLIC_APP_URL` to your Netlify URL:
+   - Change from: `http://localhost:3000`
+   - Change to: `https://your-site.netlify.app` (use HTTPS!)
+   
    In Netlify Dashboard → Site settings → Environment variables, add:
    - `DATABASE_URL` - Your Prisma database connection string
+   - `NEXT_PUBLIC_APP_URL` - **MUST be your Netlify URL** (e.g., `https://cosmic-cannoli-ea8d1e.netlify.app`)
    - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` - Clerk publishable key
    - `CLERK_SECRET_KEY` - Clerk secret key
-   - `NEXT_PUBLIC_CLERK_SIGN_IN_URL` - Usually `/sign-in`
-   - `NEXT_PUBLIC_CLERK_SIGN_UP_URL` - Usually `/sign-up`
-   - `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL` - Usually `/`
-   - `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL` - Usually `/`
+   - `RESEND_API_KEY` - Resend API key (for emails)
+   - `FROM_EMAIL` - Sender email address
    - Any other environment variables your app needs
 
 4. **Prisma Setup:**
@@ -45,6 +50,11 @@ The main Netlify configuration file that specifies:
 5. **Deploy:**
    - Netlify will automatically deploy on every push to your main branch
    - Or trigger a manual deploy from the Netlify dashboard
+   
+6. **⚠️ After Updating Environment Variables:**
+   - **You MUST redeploy** after changing environment variables
+   - Go to **Deploys** tab → Click **Trigger deploy** → **Deploy site**
+   - Environment variables are only available during build time for `NEXT_PUBLIC_*` variables
 
 ## Build Configuration
 
