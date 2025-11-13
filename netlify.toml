@@ -5,6 +5,12 @@
 [build.environment]
   NODE_VERSION = "20"
   NPM_FLAGS = "--legacy-peer-deps"
+  # Secrets scanning configuration
+  # Omit NEXT_PUBLIC_* keys (these are meant to be public and embedded in client bundle)
+  # Omit build output directories (these contain bundled code with env vars)
+  # Omit .env.example and documentation files (template/example values only)
+  SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_APP_URL,NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
+  SECRETS_SCAN_OMIT_PATHS = ".next/**,.netlify/**,node_modules/**,.env.example,**/*.md"
 
 # Next.js plugin - handles routing and serverless functions automatically
 [[plugins]]
