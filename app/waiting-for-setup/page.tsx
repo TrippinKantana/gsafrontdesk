@@ -12,12 +12,35 @@ import { trpc } from '@/lib/trpc';
 export default function WaitingForSetupPage() {
   const { organization, isLoaded: orgLoaded } = useOrganization();
   const router = useRouter();
+  const ensureAdmin = trpc.organization.ensureAdminProfile.useMutation();
   
   // Check if profile exists (poll every 10 seconds)
   const { data: profile } = trpc.employee.getProfile.useQuery(undefined, {
     refetchInterval: 10000, // Check every 10 seconds
     retry: false,
   });
+
+  // On mount, try to ensure admin profile if user is org admin
+  useEffect(() => {
+    if (orgLoaded && organization && !profile) {
+      console.log('[Waiting Page] Attempting to ensure admin profile for org admin');
+      ensureAdmin.mutate(undefined, {
+        onSuccess: (result) => {
+          if (result.success && result.created) {
+            console.log('[Waiting Page] ✅ Admin profile created, redirecting to dashboard');
+            router.replace('/dashboard');
+          } else if (result.success && !result.created) {
+            console.log('[Waiting Page] Profile already exists');
+          } else {
+            console.log('[Waiting Page] User is not org admin');
+          }
+        },
+        onError: (error) => {
+          console.error('[Waiting Page] Failed to ensure admin profile:', error);
+        },
+      });
+    }
+  }, [orgLoaded, organization, profile, ensureAdmin, router]);
 
   // If profile is found, redirect to appropriate dashboard
   useEffect(() => {

@@ -13,6 +13,7 @@ export default function OnboardingPage() {
   const { organization, isLoaded } = useOrganization();
   const router = useRouter();
   const syncOrg = trpc.organization.syncOrganization.useMutation();
+  const ensureAdmin = trpc.organization.ensureAdminProfile.useMutation();
   
   useEffect(() => {
     if (isLoaded && organization) {
@@ -23,8 +24,24 @@ export default function OnboardingPage() {
         name: organization.name,
         slug: organization.slug || organization.id,
       }, {
-        onSuccess: (data) => {
+        onSuccess: async (data) => {
           console.log('Organization synced successfully:', data);
+          
+          // After syncing org, ensure admin profile is created
+          try {
+            const adminResult = await ensureAdmin.mutateAsync();
+            if (adminResult.success && adminResult.created) {
+              console.log('Admin profile created successfully');
+            } else if (adminResult.success && !adminResult.created) {
+              console.log('Admin profile already exists');
+            } else {
+              console.log('User is not org admin, profile not created');
+            }
+          } catch (error) {
+            console.error('Failed to ensure admin profile:', error);
+            // Continue anyway - dashboard layout will handle it
+          }
+          
           setTimeout(() => {
             router.push('/dashboard');
           }, 1500);
@@ -38,7 +55,7 @@ export default function OnboardingPage() {
         },
       });
     }
-  }, [isLoaded, organization]);
+  }, [isLoaded, organization, syncOrg, ensureAdmin, router]);
   
   if (!isLoaded) {
     return (
