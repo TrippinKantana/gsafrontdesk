@@ -25,10 +25,11 @@ export default async function DashboardLayout({
   // Redirect unauthorized users (Employee, IT Staff) to their correct dashboards
   const userProfile = await getUserProfile();
   
-  // If user profile doesn't exist, redirect to onboarding to set up their profile
+  // If user profile doesn't exist, redirect to waiting page
+  // User profiles must be created by an admin in the staff management interface
   if (!userProfile) {
-    console.log('[Dashboard Layout] ⚠️ User profile not found for userId:', userId, '- redirecting to onboarding');
-    redirect('/onboarding');
+    console.log('[Dashboard Layout] ⚠️ User profile not found for userId:', userId, '- redirecting to waiting-for-setup');
+    redirect('/waiting-for-setup');
   }
   
   // Redirect non-admin/receptionist users to their correct dashboards

@@ -23,10 +23,11 @@ export default async function ITLayout({
   // ✅ SECURITY: Check user role server-side - only IT Staff and Admin can access
   const userProfile = await getUserProfile();
   
-  // If user profile doesn't exist, redirect to onboarding to set up their profile
+  // If user profile doesn't exist, redirect to waiting page
+  // User profiles must be created by an admin in the staff management interface
   if (!userProfile) {
-    console.log('[IT Layout] ⚠️ User profile not found for userId:', userId, '- redirecting to onboarding');
-    redirect('/onboarding');
+    console.log('[IT Layout] ⚠️ User profile not found for userId:', userId, '- redirecting to waiting-for-setup');
+    redirect('/waiting-for-setup');
   }
   
   // Redirect non-IT users to their correct dashboards
