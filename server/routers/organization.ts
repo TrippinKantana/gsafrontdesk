@@ -180,6 +180,14 @@ export const organizationRouter = createTRPCRouter({
           ? `${clerkUser.firstName} ${clerkUser.lastName}`
           : clerkUser.username || clerkUser.emailAddresses[0]?.emailAddress || 'Admin User';
 
+        // Check if profile exists right before upsert to detect race condition
+        // This check happens after the initial findUnique, so if it exists now,
+        // another process created it between the checks
+        const profileExistsBeforeUpsert = await ctx.db.staff.findUnique({
+          where: { clerkUserId: ctx.userId },
+          select: { id: true, createdAt: true },
+        });
+
         // Use upsert to handle race condition: if another process creates the profile
         // between the check and this call, upsert will update instead of failing
         const newStaff = await ctx.db.staff.upsert({
@@ -204,12 +212,19 @@ export const organizationRouter = createTRPCRouter({
           },
         });
 
-        console.log('[Organization] ✅ Auto-created/updated Admin profile:', newStaff.id);
+        // Determine if this was a create or update by checking if profile existed before upsert
+        const wasCreated = !profileExistsBeforeUpsert;
+
+        if (wasCreated) {
+          console.log('[Organization] ✅ Auto-created Admin profile:', newStaff.id);
+        } else {
+          console.log('[Organization] ✅ Updated existing Admin profile:', newStaff.id);
+        }
 
         return {
           success: true,
           profile: newStaff,
-          created: true,
+          created: wasCreated,
         };
       } catch (error: any) {
         console.error('[Organization] ❌ Error ensuring admin profile:', error);
