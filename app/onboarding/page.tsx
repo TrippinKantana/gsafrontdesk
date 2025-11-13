@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useOrganization } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { trpc } from '@/lib/trpc';
@@ -13,12 +13,14 @@ export default function OnboardingPage() {
   const { organization, isLoaded } = useOrganization();
   const router = useRouter();
   const syncOrg = trpc.organization.syncOrganization.useMutation();
+  const hasSynced = useRef(false);
   
   useEffect(() => {
-    // Only run once when organization is loaded
-    if (!isLoaded) return;
+    // Only run once when organization is loaded and hasn't been synced yet
+    if (!isLoaded || hasSynced.current) return;
     
     if (organization) {
+      hasSynced.current = true;
       console.log('Syncing organization:', organization.name);
       
       syncOrg.mutate({
@@ -41,6 +43,7 @@ export default function OnboardingPage() {
       });
     } else {
       // No organization - redirect to dashboard anyway
+      hasSynced.current = true;
       router.replace('/dashboard');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

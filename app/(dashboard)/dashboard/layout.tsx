@@ -25,19 +25,25 @@ export default async function DashboardLayout({
   const clerk = await clerkClient();
   let activeOrgId = orgId;
   let organization: { id: string; clerkOrgId: string } | null = null;
+  let orgMembership: { role: string; organization: { id: string } } | undefined = undefined;
 
   try {
+    // Fetch user's organization memberships once and reuse the result
+    const memberships = await clerk.users.getOrganizationMembershipList({ userId });
+    
     // If no orgId in session, try to get user's organizations
-    if (!orgId) {
-      const memberships = await clerk.users.getOrganizationMembershipList({ userId });
-      if (memberships.data.length > 0) {
-        // Use the first organization (or the one they created)
-        activeOrgId = memberships.data[0].organization.id;
-        console.log('[Dashboard Layout] No active org in session, using first org:', activeOrgId);
-      }
+    if (!orgId && memberships.data.length > 0) {
+      // Use the first organization (or the one they created)
+      activeOrgId = memberships.data[0].organization.id;
+      console.log('[Dashboard Layout] No active org in session, using first org:', activeOrgId);
     }
 
     if (activeOrgId) {
+      // Find the membership for the active organization (reuse the fetched memberships)
+      orgMembership = memberships.data.find(
+        (m) => m.organization.id === activeOrgId
+      );
+      
       const clerkOrg = await clerk.organizations.getOrganization({ organizationId: activeOrgId });
       
       // Upsert ensures organization exists in DB and name is always synced from Clerk
@@ -67,14 +73,10 @@ export default async function DashboardLayout({
   
   // If user profile doesn't exist, check if user is organization admin
   // If they are an org admin, auto-create their Admin profile
-  if (!userProfile && activeOrgId && organization) {
+  if (!userProfile && activeOrgId && organization && orgMembership) {
     try {
-      // Check if user is an organization admin in Clerk
-      // Get user's memberships and find the one for this organization
-      const memberships = await clerk.users.getOrganizationMembershipList({ userId });
-      const orgMembership = memberships.data.find(
-        (m) => m.organization.id === activeOrgId
-      );
+      // Check if user is an organization admin in Clerk (reuse the membership from above)
+      const isOrgAdmin = orgMembership.role === 'org:admin' || orgMembership.role === 'org:creator';
       
       const isOrgAdmin = orgMembership?.role === 'org:admin' || orgMembership?.role === 'org:creator';
       
