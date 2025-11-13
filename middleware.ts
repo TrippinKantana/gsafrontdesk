@@ -11,7 +11,6 @@ const isPublicRoute = createRouteMatcher([
   "/auto-select-org",
   "/no-organization",
   "/onboarding",
-  "/waiting-for-setup",
   "/employee/respond",
   "/help",
   "/api/trpc/visitor.create",

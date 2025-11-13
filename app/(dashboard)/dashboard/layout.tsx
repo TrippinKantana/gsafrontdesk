@@ -118,19 +118,22 @@ export default async function DashboardLayout({
     }
   }
   
-  // If still no profile after auto-creation attempt, redirect to waiting page
+  // If still no profile after auto-creation attempt, allow access anyway
+  // Organization creators should have been auto-created above
+  // If they still don't have a profile, they can access the dashboard to set up their organization
   if (!userProfile) {
-    console.log('[Dashboard Layout] ⚠️ User profile not found for userId:', userId, '- redirecting to waiting-for-setup');
-    redirect('/waiting-for-setup');
+    console.log('[Dashboard Layout] ⚠️ User profile not found for userId:', userId, '- allowing access for organization setup');
+    // Allow access - user can set up their organization
+    // Don't redirect based on role since we don't have a profile
+  } else {
+    // Redirect non-admin/receptionist users to their correct dashboards
+    if (userProfile.role === 'Employee') {
+      redirect('/employee/dashboard');
+    } else if (userProfile.role === 'IT Staff') {
+      redirect('/it/dashboard');
+    }
+    // Admin and Receptionist can proceed
   }
-  
-  // Redirect non-admin/receptionist users to their correct dashboards
-  if (userProfile.role === 'Employee') {
-    redirect('/employee/dashboard');
-  } else if (userProfile.role === 'IT Staff') {
-    redirect('/it/dashboard');
-  }
-  // Admin and Receptionist can proceed
   // Note: Client-side components handle organization context via useAuth()
 
   return (
