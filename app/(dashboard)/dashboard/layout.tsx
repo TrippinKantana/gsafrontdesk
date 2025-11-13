@@ -77,9 +77,11 @@ export default async function DashboardLayout({
           ? `${clerkUser.firstName} ${clerkUser.lastName}`
           : clerkUser.username || clerkUser.emailAddresses[0]?.emailAddress || 'Admin User';
         
-        // Auto-create Admin staff profile for organization creator
-        const newStaff = await db.staff.create({
-          data: {
+        // Use upsert to handle race condition: if another process creates the profile
+        // between getUserProfile() and this call, upsert will update instead of failing
+        const newStaff = await db.staff.upsert({
+          where: { clerkUserId: userId },
+          create: {
             organizationId: organization.id,
             fullName: fullName,
             email: clerkUser.emailAddresses[0]?.emailAddress || null,
@@ -88,11 +90,20 @@ export default async function DashboardLayout({
             clerkUserId: userId,
             isActive: true,
           },
+          update: {
+            // If profile already exists, ensure it's set as Admin and active
+            role: 'Admin',
+            canLogin: true,
+            isActive: true,
+            organizationId: organization.id, // Update org in case it changed
+            fullName: fullName, // Update name in case it changed in Clerk
+            email: clerkUser.emailAddresses[0]?.emailAddress || null,
+          },
         });
         
-        console.log('[Dashboard Layout] ✅ Auto-created Admin profile:', newStaff.id);
+        console.log('[Dashboard Layout] ✅ Auto-created/updated Admin profile:', newStaff.id);
         
-        // Fetch the newly created profile
+        // Fetch the newly created/updated profile
         userProfile = {
           id: newStaff.id,
           fullName: newStaff.fullName,
