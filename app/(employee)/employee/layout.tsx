@@ -23,10 +23,10 @@ export default async function EmployeeLayout({
   // ✅ SECURITY: Check user role server-side - Employees, IT Staff, and Admin can access
   const userProfile = await getUserProfile();
   
-  // SECURITY: Deny access if user profile doesn't exist
+  // If user profile doesn't exist, redirect to onboarding to set up their profile
   if (!userProfile) {
-    console.error('[Employee Layout] ❌ User profile not found for userId:', userId);
-    redirect('/sign-in');
+    console.log('[Employee Layout] ⚠️ User profile not found for userId:', userId, '- redirecting to onboarding');
+    redirect('/onboarding');
   }
   
   // Receptionist should go to admin dashboard

@@ -23,10 +23,10 @@ export default async function ITLayout({
   // ✅ SECURITY: Check user role server-side - only IT Staff and Admin can access
   const userProfile = await getUserProfile();
   
-  // SECURITY: Deny access if user profile doesn't exist
+  // If user profile doesn't exist, redirect to onboarding to set up their profile
   if (!userProfile) {
-    console.error('[IT Layout] ❌ User profile not found for userId:', userId);
-    redirect('/sign-in');
+    console.log('[IT Layout] ⚠️ User profile not found for userId:', userId, '- redirecting to onboarding');
+    redirect('/onboarding');
   }
   
   // Redirect non-IT users to their correct dashboards

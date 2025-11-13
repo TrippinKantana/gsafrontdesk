@@ -25,10 +25,10 @@ export default async function DashboardLayout({
   // Redirect unauthorized users (Employee, IT Staff) to their correct dashboards
   const userProfile = await getUserProfile();
   
-  // SECURITY: Deny access if user profile doesn't exist
+  // If user profile doesn't exist, redirect to onboarding to set up their profile
   if (!userProfile) {
-    console.error('[Dashboard Layout] ❌ User profile not found for userId:', userId);
-    redirect('/sign-in');
+    console.log('[Dashboard Layout] ⚠️ User profile not found for userId:', userId, '- redirecting to onboarding');
+    redirect('/onboarding');
   }
   
   // Redirect non-admin/receptionist users to their correct dashboards

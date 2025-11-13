@@ -1,12 +1,41 @@
 'use client';
 
-import { SignIn } from '@clerk/nextjs';
-import { useSearchParams } from 'next/navigation';
+import { SignIn, useUser } from '@clerk/nextjs';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 export default function SignInPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const { isSignedIn, isLoaded } = useUser();
+  
   // After sign-in, redirect to root page which will check user type and route appropriately
   const redirectUrl = searchParams.get('redirect_url') || '/';
+
+  // If user is already signed in, redirect them away from sign-in page
+  useEffect(() => {
+    if (isLoaded && isSignedIn) {
+      console.log('[SignIn Page] User already signed in, redirecting to:', redirectUrl);
+      router.replace(redirectUrl);
+    }
+  }, [isLoaded, isSignedIn, redirectUrl, router]);
+
+  // Show loading state while checking auth status
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If already signed in, don't render sign-in form (redirect will happen)
+  if (isSignedIn) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-4">
@@ -23,7 +52,6 @@ export default function SignInPage() {
             }
           }}
           fallbackRedirectUrl={redirectUrl}
-          forceRedirectUrl={redirectUrl}
         />
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-600">
