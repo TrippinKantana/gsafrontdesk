@@ -7,9 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Calendar, Clock, MapPin, Users, CheckCircle, XCircle, AlertCircle, Search } from 'lucide-react';
 import { format } from 'date-fns';
 
-// Force dynamic rendering
-export const dynamic = 'force-dynamic';
-
 export default function ReceptionistMeetingsPage() {
   const [filterStatus, setFilterStatus] = useState<'all' | 'scheduled' | 'in-progress' | 'completed' | 'cancelled'>('all');
   const [selectedDate, setSelectedDate] = useState<string>('');

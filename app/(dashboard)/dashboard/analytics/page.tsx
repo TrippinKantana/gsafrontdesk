@@ -12,12 +12,6 @@ import { VisitorAnalyticsCharts } from '@/components/analytics/visitor-analytics
 import { TrafficInsightsCharts } from '@/components/analytics/traffic-insights-charts';
 import { Download, Calendar } from 'lucide-react';
 
-// Force dynamic rendering - prevent static analysis
-export const dynamic = 'force-dynamic';
-export const dynamicParams = true;
-export const revalidate = 0;
-export const fetchCache = 'force-no-store';
-
 export default function AnalyticsPage() {
   const [dateRange, setDateRange] = useState({
     startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],

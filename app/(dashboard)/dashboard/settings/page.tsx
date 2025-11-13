@@ -12,9 +12,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useOrganization } from '@clerk/nextjs';
 import { trpc } from '@/lib/trpc';
 
-// Force dynamic rendering
-export const dynamic = 'force-dynamic';
-
 export default function SettingsPage() {
   const { toast } = useToast();
   const { organization, isLoaded } = useOrganization();
