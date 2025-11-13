@@ -21,8 +21,13 @@ The main Netlify configuration file that specifies:
 
 2. **Netlify will auto-detect the settings:**
    - Build command: `npm run build` (from `netlify.toml`)
-   - Publish directory: `.next` (from `netlify.toml`)
    - Framework: Next.js (auto-detected)
+   
+   ⚠️ **CRITICAL**: When using `@netlify/plugin-nextjs`, you MUST NOT set a publish directory:
+   - Go to **Site settings** → **Build & deploy** → **Build settings**
+   - **Clear/remove** the "Publish directory" field (leave it empty)
+   - The Next.js plugin handles the output automatically
+   - If publish directory is set, you'll get: "Your publish directory cannot be the same as the base directory"
 
 3. **Set Environment Variables:**
    ⚠️ **CRITICAL**: See [NETLIFY_ENV_SETUP.md](./NETLIFY_ENV_SETUP.md) for detailed instructions.

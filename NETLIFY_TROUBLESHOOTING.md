@@ -27,13 +27,23 @@ Check that `netlify.toml` is correct:
 ```toml
 [build]
   command = "npm run build"
-  # Don't set publish directory when using @netlify/plugin-nextjs
+  # CRITICAL: Do NOT set publish directory when using @netlify/plugin-nextjs
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 ```
 
-**Important:** When using `@netlify/plugin-nextjs`, you should NOT set a `publish` directory - the plugin handles it automatically.
+**CRITICAL FIX - Publish Directory Error:**
+
+If you see: `"Your publish directory cannot be the same as the base directory"`:
+
+1. Go to **Netlify Dashboard** → Your site → **Site settings** → **Build & deploy** → **Build settings**
+2. Find the **"Publish directory"** field
+3. **Clear/delete** the value (leave it completely empty)
+4. Click **Save**
+5. Trigger a new deploy
+
+**Why:** When using `@netlify/plugin-nextjs`, you MUST NOT set a publish directory. The plugin handles the output automatically. If it's set in the UI, it conflicts with the plugin.
 
 ### 3. Check Environment Variables
 
@@ -103,6 +113,16 @@ npm run build
 If local build fails, fix those errors first before deploying.
 
 ### 10. Common Issues and Solutions
+
+#### Issue: "Your publish directory cannot be the same as the base directory"
+**Solution:** 
+1. Go to **Netlify Dashboard** → Your site → **Site settings** → **Build & deploy** → **Build settings**
+2. Find **"Publish directory"** field
+3. **Clear/delete** the value completely (leave empty)
+4. Click **Save**
+5. Trigger a new deploy
+
+**Why:** `@netlify/plugin-nextjs` handles the output automatically. Setting a publish directory conflicts with the plugin.
 
 #### Issue: "Prisma Client not generated"
 **Solution:** Add to `package.json`:

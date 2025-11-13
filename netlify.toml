@@ -1,7 +1,8 @@
 [build]
   command = "npm run build"
-  # Don't set publish directory when using @netlify/plugin-nextjs
+  # CRITICAL: Do NOT set publish directory when using @netlify/plugin-nextjs
   # The plugin handles the output automatically
+  # If publish is set in Netlify UI, it must be cleared/removed
 
 [build.environment]
   NODE_VERSION = "20"
