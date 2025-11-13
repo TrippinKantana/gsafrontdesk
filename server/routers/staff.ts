@@ -151,6 +151,9 @@ export const staffRouter = createTRPCRouter({
             lastName: input.fullName.split(' ').slice(1).join(' ') || undefined,
             skipPasswordChecks: true, // Skip password strength requirements
             skipPasswordRequirement: false,
+            unsafeMetadata: {
+              legal_accepted_at: new Date().toISOString(),
+            },
           });
 
           clerkUserId = clerkUser.id;
@@ -395,6 +398,9 @@ export const staffRouter = createTRPCRouter({
             lastName: input.fullName.split(' ').slice(1).join(' ') || undefined,
             skipPasswordChecks: true, // Skip password strength requirements
             skipPasswordRequirement: false,
+            unsafeMetadata: {
+              legal_accepted_at: new Date().toISOString(),
+            },
           });
 
           clerkUserId = clerkUser.id;
