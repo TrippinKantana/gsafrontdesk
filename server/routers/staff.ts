@@ -157,9 +157,23 @@ export const staffRouter = createTRPCRouter({
 
           // Set legalAcceptedAt via updateUser (required when "Require express consent to legal documents" is enabled in Clerk)
           // Note: TypeScript types may not include this property, but Clerk API accepts it
-          await clerk.users.updateUser(clerkUserId, {
-            legalAcceptedAt: new Date().toISOString(),
-          } as any);
+          try {
+            await clerk.users.updateUser(clerkUserId, {
+              legalAcceptedAt: new Date().toISOString(),
+            } as any);
+          } catch (updateError: any) {
+            // If updateUser fails, delete the created user to maintain atomicity
+            console.error('[Staff Create] Failed to set legalAcceptedAt, cleaning up created user:', updateError);
+            try {
+              await clerk.users.deleteUser(clerkUserId);
+            } catch (deleteError: any) {
+              console.error('[Staff Create] Failed to delete orphaned user:', deleteError);
+            }
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: `Failed to initialize user: ${updateError.message || 'Could not set legal acceptance date'}`,
+            });
+          }
 
           // ✅ First, look up the organization in our database to get the internal ID
           organization = await ctx.db.organization.findUnique({
@@ -420,9 +434,23 @@ export const staffRouter = createTRPCRouter({
 
           // Set legalAcceptedAt via updateUser (required when "Require express consent to legal documents" is enabled in Clerk)
           // Note: TypeScript types may not include this property, but Clerk API accepts it
-          await clerk.users.updateUser(clerkUserId, {
-            legalAcceptedAt: new Date().toISOString(),
-          } as any);
+          try {
+            await clerk.users.updateUser(clerkUserId, {
+              legalAcceptedAt: new Date().toISOString(),
+            } as any);
+          } catch (updateError: any) {
+            // If updateUser fails, delete the created user to maintain atomicity
+            console.error('[Staff Update] Failed to set legalAcceptedAt, cleaning up created user:', updateError);
+            try {
+              await clerk.users.deleteUser(clerkUserId);
+            } catch (deleteError: any) {
+              console.error('[Staff Update] Failed to delete orphaned user:', deleteError);
+            }
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: `Failed to initialize user: ${updateError.message || 'Could not set legal acceptance date'}`,
+            });
+          }
 
           // ✅ Look up organization to get internal database ID
           if (!ctx.organizationId) {
