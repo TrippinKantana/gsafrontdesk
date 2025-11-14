@@ -1,5 +1,5 @@
 [build]
-  command = "npm run build"
+  command = "NODE_OPTIONS=--max-old-space-size=4096 npm run build"
   # CRITICAL: Do NOT set publish directory when using @netlify/plugin-nextjs
   # The plugin handles the output automatically
   # If publish is set in Netlify UI, it must be cleared/removed
@@ -7,6 +7,7 @@
 [build.environment]
   NODE_VERSION = "20"
   NPM_FLAGS = "--legacy-peer-deps"
+  NODE_OPTIONS = "--max-old-space-size=4096"
   # Secrets scanning configuration
   # Omit NEXT_PUBLIC_* keys (these are meant to be public and embedded in client bundle)
   # Omit build output directories (these contain bundled code with env vars)
