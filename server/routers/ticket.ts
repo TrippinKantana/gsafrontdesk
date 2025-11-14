@@ -825,7 +825,7 @@ export const ticketRouter = createTRPCRouter({
 
           if (notificationOrg) {
             const notifications = notificationRecipients
-              .filter(({ recipient }) => recipient.clerkUserId)
+              .filter(({ recipient }) => recipient && recipient.clerkUserId)
               .map(({ recipient, role }) => {
                 // Determine action URL based on recipient role
                 const actionUrl = role === 'Employee'
@@ -834,8 +834,8 @@ export const ticketRouter = createTRPCRouter({
 
                 return {
                   organizationId: notificationOrg.id, // ✅ Use internal database organization ID
-                  userId: recipient.clerkUserId!,
-                  staffId: recipient.id,
+                  userId: recipient!.clerkUserId!,
+                  staffId: recipient!.id,
                   type: 'ticket_message' as const,
                   title: 'New Message on Ticket',
                   message: `${staff.fullName} replied to ticket ${ticket.ticketNumber}: "${input.message.substring(0, 100)}${input.message.length > 100 ? '...' : ''}"`,
