@@ -27,7 +27,7 @@ export default function ProjectsPage() {
       (project) =>
         project.title.toLowerCase().includes(query) ||
         project.description?.toLowerCase().includes(query) ||
-        project.assignedTo?.fullName.toLowerCase().includes(query)
+        (project.assignedTo?.fullName?.toLowerCase() ?? '').includes(query)
     );
   }, [projects, searchQuery]);
 
