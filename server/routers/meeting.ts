@@ -9,11 +9,11 @@ export const meetingRouter = createTRPCRouter({
     .input(
       z.object({
         title: z.string().min(1, 'Title is required'),
-        description: z.string().optional(),
+        description: z.string().min(1, 'Description is required'),
         startTime: z.string(), // ISO date string
         endTime: z.string(), // ISO date string
-        location: z.string().optional(),
-        expectedVisitors: z.array(z.string()),
+        location: z.string().min(1, 'Location is required'),
+        expectedVisitors: z.array(z.string()).min(1, 'At least one expected visitor is required'),
         notes: z.string().optional(),
       })
     )
@@ -377,11 +377,19 @@ export const meetingRouter = createTRPCRouter({
       }
 
       // ✅ Verify meeting belongs to current organization
-      if (ctx.organizationId && meeting.organizationId !== ctx.organizationId) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Meeting not found in your organization',
+      if (ctx.organizationId) {
+        // Look up organization by Clerk ID to get internal database ID
+        const organization = await ctx.db.organization.findUnique({
+          where: { clerkOrgId: ctx.organizationId },
+          select: { id: true },
         });
+
+        if (!organization || meeting.organizationId !== organization.id) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Meeting not found in your organization',
+          });
+        }
       }
 
       return meeting;
@@ -422,11 +430,20 @@ export const meetingRouter = createTRPCRouter({
         });
       }
 
-      if (ctx.organizationId && existingMeeting.organizationId !== ctx.organizationId) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Meeting not found in your organization',
+      // ✅ Verify meeting belongs to current organization
+      if (ctx.organizationId) {
+        // Look up organization by Clerk ID to get internal database ID
+        const organization = await ctx.db.organization.findUnique({
+          where: { clerkOrgId: ctx.organizationId },
+          select: { id: true },
         });
+
+        if (!organization || existingMeeting.organizationId !== organization.id) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Meeting not found in your organization',
+          });
+        }
       }
 
       const { id, ...updateData } = input;
@@ -557,11 +574,20 @@ export const meetingRouter = createTRPCRouter({
         });
       }
 
-      if (ctx.organizationId && existingMeeting.organizationId !== ctx.organizationId) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Meeting not found in your organization',
+      // ✅ Verify meeting belongs to current organization
+      if (ctx.organizationId) {
+        // Look up organization by Clerk ID to get internal database ID
+        const organization = await ctx.db.organization.findUnique({
+          where: { clerkOrgId: ctx.organizationId },
+          select: { id: true },
         });
+
+        if (!organization || existingMeeting.organizationId !== organization.id) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Meeting not found in your organization',
+          });
+        }
       }
 
       // ✅ Delete from connected calendars before deleting meeting

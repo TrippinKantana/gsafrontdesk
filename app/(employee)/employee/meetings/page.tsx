@@ -94,10 +94,49 @@ export default function EmployeeMeetingsPage() {
   };
 
   const handleCreate = () => {
+    // Validate required fields
+    if (!formData.title?.trim()) {
+      toast({ title: 'Error', description: 'Meeting title is required.', variant: 'destructive' });
+      return;
+    }
+    if (!formData.description?.trim()) {
+      toast({ title: 'Error', description: 'Description is required.', variant: 'destructive' });
+      return;
+    }
+    if (!formData.startTime) {
+      toast({ title: 'Error', description: 'Start time is required.', variant: 'destructive' });
+      return;
+    }
+    if (!formData.endTime) {
+      toast({ title: 'Error', description: 'End time is required.', variant: 'destructive' });
+      return;
+    }
+    if (!formData.location?.trim()) {
+      toast({ title: 'Error', description: 'Location is required.', variant: 'destructive' });
+      return;
+    }
+    if (!formData.expectedVisitors?.trim()) {
+      toast({ title: 'Error', description: 'Expected Visitors is required.', variant: 'destructive' });
+      return;
+    }
+
+    // Validate that end time is after start time
+    const startDate = new Date(formData.startTime);
+    const endDate = new Date(formData.endTime);
+    if (endDate <= startDate) {
+      toast({ title: 'Error', description: 'End time must be after start time.', variant: 'destructive' });
+      return;
+    }
+
     const visitors = formData.expectedVisitors
       .split(',')
       .map((v) => v.trim())
       .filter((v) => v);
+
+    if (visitors.length === 0) {
+      toast({ title: 'Error', description: 'At least one expected visitor is required.', variant: 'destructive' });
+      return;
+    }
 
     createMeeting.mutate({
       ...formData,
@@ -122,10 +161,49 @@ export default function EmployeeMeetingsPage() {
   const handleUpdate = () => {
     if (!selectedMeeting) return;
 
+    // Validate required fields (same validation as handleCreate)
+    if (!formData.title?.trim()) {
+      toast({ title: 'Error', description: 'Meeting title is required.', variant: 'destructive' });
+      return;
+    }
+    if (!formData.description?.trim()) {
+      toast({ title: 'Error', description: 'Description is required.', variant: 'destructive' });
+      return;
+    }
+    if (!formData.startTime) {
+      toast({ title: 'Error', description: 'Start time is required.', variant: 'destructive' });
+      return;
+    }
+    if (!formData.endTime) {
+      toast({ title: 'Error', description: 'End time is required.', variant: 'destructive' });
+      return;
+    }
+    if (!formData.location?.trim()) {
+      toast({ title: 'Error', description: 'Location is required.', variant: 'destructive' });
+      return;
+    }
+    if (!formData.expectedVisitors?.trim()) {
+      toast({ title: 'Error', description: 'Expected Visitors is required.', variant: 'destructive' });
+      return;
+    }
+
+    // Validate that end time is after start time
+    const startDate = new Date(formData.startTime);
+    const endDate = new Date(formData.endTime);
+    if (endDate <= startDate) {
+      toast({ title: 'Error', description: 'End time must be after start time.', variant: 'destructive' });
+      return;
+    }
+
     const visitors = formData.expectedVisitors
       .split(',')
       .map((v) => v.trim())
       .filter((v) => v);
+
+    if (visitors.length === 0) {
+      toast({ title: 'Error', description: 'At least one expected visitor is required.', variant: 'destructive' });
+      return;
+    }
 
     updateMeeting.mutate({
       id: selectedMeeting.id,
@@ -334,13 +412,14 @@ export default function EmployeeMeetingsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="create-description">Description</Label>
+              <Label htmlFor="create-description">Description *</Label>
               <Textarea
                 id="create-description"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="Meeting agenda or details..."
                 rows={3}
+                required
               />
             </div>
 
@@ -367,22 +446,24 @@ export default function EmployeeMeetingsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="create-location">Location</Label>
+              <Label htmlFor="create-location">Location *</Label>
               <Input
                 id="create-location"
                 value={formData.location}
                 onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                 placeholder="e.g., Conference Room A, Building 2"
+                required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="create-visitors">Expected Visitors</Label>
+              <Label htmlFor="create-visitors">Expected Visitors *</Label>
               <Input
                 id="create-visitors"
                 value={formData.expectedVisitors}
                 onChange={(e) => setFormData({ ...formData, expectedVisitors: e.target.value })}
                 placeholder="Comma-separated names or emails"
+                required
               />
               <p className="text-xs text-gray-500">e.g., John Doe, jane@example.com</p>
             </div>

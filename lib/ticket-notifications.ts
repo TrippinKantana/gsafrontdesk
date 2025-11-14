@@ -46,6 +46,7 @@ interface TicketMessageNotification {
   message: string;
   ticketId: string;
   recipientEmails: string[];
+  recipientRole?: 'Employee' | 'IT Staff' | 'Admin' | 'Receptionist'; // Role of recipient to determine correct URL
 }
 
 export async function sendTicketCreatedEmail(data: TicketCreatedNotification): Promise<boolean> {
@@ -128,7 +129,11 @@ export async function sendTicketMessageEmail(data: TicketMessageNotification): P
   }
 
   try {
-    const ticketUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/it/tickets/${data.ticketId}`;
+    // Determine correct URL based on recipient role
+    // Employee recipients should go to /employee/tickets, IT Staff/Admin/Receptionist to /it/tickets
+    const ticketUrl = data.recipientRole === 'Employee'
+      ? `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/employee/tickets/${data.ticketId}`
+      : `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/it/tickets/${data.ticketId}`;
 
     const html = render(
       TicketMessageEmail({

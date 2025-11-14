@@ -370,25 +370,67 @@ export const staffRouter = createTRPCRouter({
       }
       
       // ✅ Look up organization by Clerk ID to get internal database ID
-      const organization = await ctx.db.organization.findUnique({
+      let organization = await ctx.db.organization.findUnique({
         where: { clerkOrgId: ctx.organizationId },
-        select: { id: true },
+        select: { id: true, clerkOrgId: true, name: true },
       });
 
+      // If organization not found, try to sync it from Clerk
       if (!organization) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Organization not found in database',
-        });
+        console.log('[Staff.update] Organization not found, attempting to sync from Clerk:', ctx.organizationId);
+        try {
+          const { clerkClient } = await import('@clerk/nextjs/server');
+          const clerk = await clerkClient();
+          const clerkOrg = await clerk.organizations.getOrganization({ organizationId: ctx.organizationId });
+          
+          // Create organization in database
+          organization = await ctx.db.organization.upsert({
+            where: { clerkOrgId: ctx.organizationId },
+            create: {
+              clerkOrgId: clerkOrg.id,
+              name: clerkOrg.name,
+              slug: clerkOrg.slug || clerkOrg.id,
+            },
+            update: {
+              name: clerkOrg.name,
+              slug: clerkOrg.slug || clerkOrg.id,
+            },
+            select: { id: true, clerkOrgId: true, name: true },
+          });
+          
+          console.log('[Staff.update] ✅ Organization synced to database:', organization.id);
+        } catch (syncError: any) {
+          console.error('[Staff.update] Failed to sync organization:', {
+            clerkOrgId: ctx.organizationId,
+            error: syncError.message,
+            staffId: input.id,
+          });
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Organization not found in database and could not be synced. Please try again or contact support.',
+          });
+        }
       }
       
       const existingStaff = await ctx.db.staff.findUnique({
         where: { 
           id: input.id,
         },
+        select: {
+          id: true,
+          organizationId: true,
+          fullName: true,
+          clerkUserId: true,
+          canLogin: true,
+          role: true,
+        },
       });
 
       if (!existingStaff) {
+        console.error('[Staff.update] Staff member not found:', {
+          staffId: input.id,
+          organizationId: organization.id,
+        });
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Staff member not found',
@@ -397,10 +439,100 @@ export const staffRouter = createTRPCRouter({
       
       // ✅ Verify staff belongs to this organization (compare database IDs)
       if (existingStaff.organizationId !== organization.id) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Staff member not found in your organization',
-        });
+        // If staff has a Clerk user ID, check if they're actually in the current Clerk organization
+        if (existingStaff.clerkUserId) {
+          try {
+            const { clerkClient } = await import('@clerk/nextjs/server');
+            const clerk = await clerkClient();
+            
+            // Check if the staff member is in the current Clerk organization
+            const memberships = await clerk.users.getOrganizationMembershipList({
+              userId: existingStaff.clerkUserId,
+            });
+            
+            const isInCurrentOrg = memberships.data.some(
+              (m) => m.organization.id === ctx.organizationId
+            );
+            
+            if (isInCurrentOrg) {
+              // Staff is in the Clerk organization but database has wrong organizationId
+              // This is a data inconsistency - fix it by updating the organizationId
+              console.log('[Staff.update] ⚠️ Organization mismatch detected but staff is in Clerk org. Fixing database organizationId:', {
+                staffId: input.id,
+                staffName: existingStaff.fullName,
+                oldOrgId: existingStaff.organizationId,
+                newOrgId: organization.id,
+                clerkOrgId: ctx.organizationId,
+              });
+              
+              // Update the staff member's organizationId to match
+              await ctx.db.staff.update({
+                where: { id: input.id },
+                data: { organizationId: organization.id },
+              });
+              
+              console.log('[Staff.update] ✅ Fixed organizationId mismatch');
+              // Continue with the update
+            } else {
+              // Staff is not in the current Clerk organization
+              const staffOrg = await ctx.db.organization.findUnique({
+                where: { id: existingStaff.organizationId },
+                select: { name: true, clerkOrgId: true },
+              });
+              
+              console.error('[Staff.update] Organization mismatch - staff not in Clerk org:', {
+                staffId: input.id,
+                staffName: existingStaff.fullName,
+                staffOrgId: existingStaff.organizationId,
+                staffOrgName: staffOrg?.name,
+                staffOrgClerkId: staffOrg?.clerkOrgId,
+                currentOrgId: organization.id,
+                currentOrgName: organization.name,
+                currentOrgClerkId: organization.clerkOrgId,
+              });
+              
+              throw new TRPCError({
+                code: 'FORBIDDEN',
+                message: `Staff member "${existingStaff.fullName}" belongs to a different organization. Please ensure the staff member is in your current organization.`,
+              });
+            }
+          } catch (clerkError: any) {
+            // If Clerk check fails, fall back to original error
+            console.error('[Staff.update] Failed to check Clerk organization membership:', clerkError);
+            const staffOrg = await ctx.db.organization.findUnique({
+              where: { id: existingStaff.organizationId },
+              select: { name: true, clerkOrgId: true },
+            });
+            
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: `Staff member "${existingStaff.fullName}" belongs to a different organization. Please ensure the staff member is in your current organization.`,
+            });
+          }
+        } else {
+          // Staff doesn't have a Clerk user ID, so we can't verify via Clerk
+          // Just check the database organizationId
+          const staffOrg = await ctx.db.organization.findUnique({
+            where: { id: existingStaff.organizationId },
+            select: { name: true, clerkOrgId: true },
+          });
+          
+          console.error('[Staff.update] Organization mismatch (no Clerk user):', {
+            staffId: input.id,
+            staffName: existingStaff.fullName,
+            staffOrgId: existingStaff.organizationId,
+            staffOrgName: staffOrg?.name,
+            staffOrgClerkId: staffOrg?.clerkOrgId,
+            currentOrgId: organization.id,
+            currentOrgName: organization.name,
+            currentOrgClerkId: organization.clerkOrgId,
+          });
+          
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: `Staff member "${existingStaff.fullName}" belongs to a different organization. Please ensure the staff member is in your current organization.`,
+          });
+        }
       }
 
       let clerkUserId = existingStaff.clerkUserId;

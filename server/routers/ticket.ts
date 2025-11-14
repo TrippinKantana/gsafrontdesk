@@ -657,12 +657,18 @@ export const ticketRouter = createTRPCRouter({
         include: {
           createdBy: {
             select: {
+              id: true,
               email: true,
+              role: true,
+              clerkUserId: true,
             },
           },
           assignedTo: {
             select: {
+              id: true,
               email: true,
+              role: true,
+              clerkUserId: true,
             },
           },
         },
@@ -721,37 +727,88 @@ export const ticketRouter = createTRPCRouter({
         data: { updatedAt: new Date() },
       });
 
-      console.log(`[Ticket] New message on ${ticket.ticketNumber} by ${staff.fullName}`);
+      console.log(`[Ticket] New message on ${ticket.ticketNumber} by ${staff.fullName} (${staff.role})`);
 
-      // Send email notification (skip internal notes for requester)
+      // Determine if sender is IT Staff/Admin/Receptionist or Employee
+      const isITStaff = staff.role === 'IT Staff' || staff.role === 'Admin' || staff.role === 'Receptionist';
+      const isEmployee = staff.role === 'Employee';
+
+      // Send email notification (skip internal notes)
       if (!input.isInternal) {
         const recipientEmails: string[] = [];
+        const notificationRecipients: Array<{
+          recipient: typeof ticket.createdBy | typeof ticket.assignedTo;
+          role: 'Employee' | 'IT Staff' | 'Admin' | 'Receptionist';
+        }> = [];
 
-        // Notify ticket creator if they didn't send this message
-        if (ticket.createdBy.email && ticket.createdById !== staff.id) {
-          recipientEmails.push(ticket.createdBy.email);
+        if (isITStaff) {
+          // IT Staff/Admin/Receptionist replied → notify Employee (ticket creator)
+          if (ticket.createdBy.email && ticket.createdById !== staff.id) {
+            recipientEmails.push(ticket.createdBy.email);
+            notificationRecipients.push({
+              recipient: ticket.createdBy,
+              role: ticket.createdBy.role as 'Employee' | 'IT Staff' | 'Admin' | 'Receptionist',
+            });
+          }
+          // Also notify assigned IT Staff if they're different from sender
+          if (ticket.assignedTo && ticket.assignedTo.email && ticket.assignedToId !== staff.id && ticket.assignedToId !== ticket.createdById) {
+            recipientEmails.push(ticket.assignedTo.email);
+            notificationRecipients.push({
+              recipient: ticket.assignedTo,
+              role: ticket.assignedTo.role as 'Employee' | 'IT Staff' | 'Admin' | 'Receptionist',
+            });
+          }
+        } else if (isEmployee) {
+          // Employee replied → notify assigned IT Staff
+          if (ticket.assignedTo && ticket.assignedTo.email && ticket.assignedToId !== staff.id) {
+            recipientEmails.push(ticket.assignedTo.email);
+            notificationRecipients.push({
+              recipient: ticket.assignedTo,
+              role: ticket.assignedTo.role as 'Employee' | 'IT Staff' | 'Admin' | 'Receptionist',
+            });
+          }
         }
 
-        // Notify assigned IT staff if they didn't send this message
-        if (ticket.assignedTo && ticket.assignedTo.email && ticket.assignedToId !== staff.id) {
-          recipientEmails.push(ticket.assignedTo.email);
-        }
-
+        // Send email to all recipients (grouped by role for URL determination)
         if (recipientEmails.length > 0) {
-          await sendTicketMessageEmail({
-            ticketNumber: ticket.ticketNumber,
-            ticketTitle: ticket.title,
-            senderName: staff.fullName,
-            message: input.message,
-            ticketId: ticket.id,
-            recipientEmails,
-          }).catch((error) => {
-            console.error('Failed to send ticket message email:', error);
-          });
+          // Group recipients by role to determine correct URL
+          const employeeRecipients = notificationRecipients.filter(r => r.role === 'Employee');
+          const itStaffRecipients = notificationRecipients.filter(r => r.role !== 'Employee');
+          
+          // Send separate emails for Employees and IT Staff to ensure correct URLs
+          if (employeeRecipients.length > 0) {
+            const employeeEmails = employeeRecipients.map(r => r.recipient.email).filter(Boolean) as string[];
+            await sendTicketMessageEmail({
+              ticketNumber: ticket.ticketNumber,
+              ticketTitle: ticket.title,
+              senderName: staff.fullName,
+              message: input.message,
+              ticketId: ticket.id,
+              recipientEmails: employeeEmails,
+              recipientRole: 'Employee',
+            }).catch((error) => {
+              console.error('Failed to send ticket message email to employees:', error);
+            });
+          }
+          
+          if (itStaffRecipients.length > 0) {
+            const itStaffEmails = itStaffRecipients.map(r => r.recipient.email).filter(Boolean) as string[];
+            await sendTicketMessageEmail({
+              ticketNumber: ticket.ticketNumber,
+              ticketTitle: ticket.title,
+              senderName: staff.fullName,
+              message: input.message,
+              ticketId: ticket.id,
+              recipientEmails: itStaffEmails,
+              recipientRole: itStaffRecipients[0].role, // Use first recipient's role for URL
+            }).catch((error) => {
+              console.error('Failed to send ticket message email to IT staff:', error);
+            });
+          }
         }
 
-        // ✅ Create in-app notifications for recipients (skip internal notes)
-        if (ctx.organizationId) {
+        // ✅ Create in-app notifications (skip internal notes)
+        if (ctx.organizationId && notificationRecipients.length > 0) {
           // Convert Clerk organization ID to internal database organization ID
           const notificationOrg = await ctx.db.organization.findUnique({
             where: { clerkOrgId: ctx.organizationId },
@@ -759,63 +816,37 @@ export const ticketRouter = createTRPCRouter({
           });
 
           if (notificationOrg) {
-            const notifications = [];
+            const notifications = notificationRecipients
+              .filter(({ recipient }) => recipient.clerkUserId)
+              .map(({ recipient, role }) => {
+                // Determine action URL based on recipient role
+                const actionUrl = role === 'Employee'
+                  ? `/employee/tickets/${ticket.id}` // Employee should go to employee ticket page
+                  : `/it/tickets/${ticket.id}`; // IT Staff/Admin/Receptionist should go to IT ticket page
 
-            // Notify ticket creator if they didn't send this message
-            if (ticket.createdById !== staff.id) {
-              const creator = await ctx.db.staff.findUnique({
-                where: { id: ticket.createdById },
-                select: { clerkUserId: true },
-              });
-              if (creator?.clerkUserId) {
-                notifications.push({
+                return {
                   organizationId: notificationOrg.id, // ✅ Use internal database organization ID
-                  userId: creator.clerkUserId,
-                  staffId: ticket.createdById,
-                  type: 'ticket_message',
+                  userId: recipient.clerkUserId!,
+                  staffId: recipient.id,
+                  type: 'ticket_message' as const,
                   title: 'New Message on Ticket',
-                  message: `${staff.fullName} replied to your ticket ${ticket.ticketNumber}: "${input.message.substring(0, 100)}${input.message.length > 100 ? '...' : ''}"`,
+                  message: `${staff.fullName} replied to ticket ${ticket.ticketNumber}: "${input.message.substring(0, 100)}${input.message.length > 100 ? '...' : ''}"`,
                   relatedId: ticket.id,
-                  relatedType: 'ticket',
-                  actionUrl: `/employee/tickets/${ticket.id}`,
+                  relatedType: 'ticket' as const,
+                  actionUrl,
                   metadata: {
                     ticketNumber: ticket.ticketNumber,
                     senderName: staff.fullName,
+                    senderRole: staff.role,
                   },
-                });
-              }
-            }
-
-            // Notify assigned IT staff if they didn't send this message
-            if (ticket.assignedToId && ticket.assignedToId !== staff.id) {
-              const assignedStaff = await ctx.db.staff.findUnique({
-                where: { id: ticket.assignedToId },
-                select: { clerkUserId: true },
+                };
               });
-              if (assignedStaff?.clerkUserId) {
-                notifications.push({
-                  organizationId: notificationOrg.id, // ✅ Use internal database organization ID
-                  userId: assignedStaff.clerkUserId,
-                  staffId: ticket.assignedToId,
-                  type: 'ticket_message',
-                  title: 'New Message on Ticket',
-                  message: `${staff.fullName} added a message to ticket ${ticket.ticketNumber}: "${input.message.substring(0, 100)}${input.message.length > 100 ? '...' : ''}"`,
-                  relatedId: ticket.id,
-                  relatedType: 'ticket',
-                  actionUrl: `/it/tickets/${ticket.id}`,
-                  metadata: {
-                    ticketNumber: ticket.ticketNumber,
-                    senderName: staff.fullName,
-                  },
-                });
-              }
-            }
 
             if (notifications.length > 0) {
               await ctx.db.notification.createMany({
                 data: notifications,
               });
-              console.log(`[Notification] Created ${notifications.length} ticket message notifications`);
+              console.log(`[Notification] Created ${notifications.length} ticket message notification(s)`);
             }
           } else {
             console.warn('[Notification] Organization not found for Clerk ID:', ctx.organizationId);
