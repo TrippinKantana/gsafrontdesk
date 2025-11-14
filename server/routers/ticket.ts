@@ -772,38 +772,46 @@ export const ticketRouter = createTRPCRouter({
         // Send email to all recipients (grouped by role for URL determination)
         if (recipientEmails.length > 0) {
           // Group recipients by role to determine correct URL
-          const employeeRecipients = notificationRecipients.filter(r => r.role === 'Employee');
-          const itStaffRecipients = notificationRecipients.filter(r => r.role !== 'Employee');
+          const employeeRecipients = notificationRecipients.filter(r => r.role === 'Employee' && r.recipient);
+          const itStaffRecipients = notificationRecipients.filter(r => r.role !== 'Employee' && r.recipient);
           
           // Send separate emails for Employees and IT Staff to ensure correct URLs
           if (employeeRecipients.length > 0) {
-            const employeeEmails = employeeRecipients.map(r => r.recipient.email).filter(Boolean) as string[];
-            await sendTicketMessageEmail({
-              ticketNumber: ticket.ticketNumber,
-              ticketTitle: ticket.title,
-              senderName: staff.fullName,
-              message: input.message,
-              ticketId: ticket.id,
-              recipientEmails: employeeEmails,
-              recipientRole: 'Employee',
-            }).catch((error) => {
-              console.error('Failed to send ticket message email to employees:', error);
-            });
+            const employeeEmails = employeeRecipients
+              .map(r => r.recipient?.email)
+              .filter((email): email is string => Boolean(email));
+            if (employeeEmails.length > 0) {
+              await sendTicketMessageEmail({
+                ticketNumber: ticket.ticketNumber,
+                ticketTitle: ticket.title,
+                senderName: staff.fullName,
+                message: input.message,
+                ticketId: ticket.id,
+                recipientEmails: employeeEmails,
+                recipientRole: 'Employee',
+              }).catch((error) => {
+                console.error('Failed to send ticket message email to employees:', error);
+              });
+            }
           }
           
           if (itStaffRecipients.length > 0) {
-            const itStaffEmails = itStaffRecipients.map(r => r.recipient.email).filter(Boolean) as string[];
-            await sendTicketMessageEmail({
-              ticketNumber: ticket.ticketNumber,
-              ticketTitle: ticket.title,
-              senderName: staff.fullName,
-              message: input.message,
-              ticketId: ticket.id,
-              recipientEmails: itStaffEmails,
-              recipientRole: itStaffRecipients[0].role, // Use first recipient's role for URL
-            }).catch((error) => {
-              console.error('Failed to send ticket message email to IT staff:', error);
-            });
+            const itStaffEmails = itStaffRecipients
+              .map(r => r.recipient?.email)
+              .filter((email): email is string => Boolean(email));
+            if (itStaffEmails.length > 0) {
+              await sendTicketMessageEmail({
+                ticketNumber: ticket.ticketNumber,
+                ticketTitle: ticket.title,
+                senderName: staff.fullName,
+                message: input.message,
+                ticketId: ticket.id,
+                recipientEmails: itStaffEmails,
+                recipientRole: itStaffRecipients[0]!.role, // Use first recipient's role for URL
+              }).catch((error) => {
+                console.error('Failed to send ticket message email to IT staff:', error);
+              });
+            }
           }
         }
 

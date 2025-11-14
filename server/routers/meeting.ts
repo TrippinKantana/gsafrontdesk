@@ -174,7 +174,7 @@ export const meetingRouter = createTRPCRouter({
 
         await ctx.db.notification.create({
           data: {
-            organizationId: ctx.organizationId,
+            organizationId: organization.id, // ✅ Use internal database organization ID, not Clerk ID
             userId: staff.clerkUserId,
             staffId: staff.id,
             type: 'meeting_scheduled',
@@ -507,42 +507,52 @@ export const meetingRouter = createTRPCRouter({
 
       // ✅ Notify host if status changed (especially cancelled)
       if (input.status && existingMeeting.status !== input.status && meeting.host.clerkUserId && ctx.organizationId) {
-        let notificationMessage = '';
-        let notificationTitle = '';
-        
-        if (input.status === 'cancelled') {
-          notificationTitle = 'Meeting Cancelled';
-          notificationMessage = `Your meeting "${meeting.title}" has been cancelled`;
-        } else if (input.status === 'completed') {
-          notificationTitle = 'Meeting Completed';
-          notificationMessage = `Your meeting "${meeting.title}" has been marked as completed`;
-        } else if (input.status === 'in-progress') {
-          notificationTitle = 'Meeting Started';
-          notificationMessage = `Your meeting "${meeting.title}" is now in progress`;
-        } else {
-          notificationTitle = 'Meeting Updated';
-          notificationMessage = `Your meeting "${meeting.title}" status changed to ${input.status}`;
-        }
-
-        await ctx.db.notification.create({
-          data: {
-            organizationId: ctx.organizationId,
-            userId: meeting.host.clerkUserId,
-            staffId: meeting.host.id,
-            type: 'meeting_updated',
-            title: notificationTitle,
-            message: notificationMessage,
-            relatedId: meeting.id,
-            relatedType: 'meeting',
-            actionUrl: '/employee/meetings',
-            metadata: {
-              meetingTitle: meeting.title,
-              oldStatus: existingMeeting.status,
-              newStatus: input.status,
-            },
-          },
+        // Look up organization by Clerk ID to get internal database ID for notification
+        const notificationOrg = await ctx.db.organization.findUnique({
+          where: { clerkOrgId: ctx.organizationId },
+          select: { id: true },
         });
-        console.log('[Notification] Host notified of meeting update');
+
+        if (notificationOrg) {
+          let notificationMessage = '';
+          let notificationTitle = '';
+          
+          if (input.status === 'cancelled') {
+            notificationTitle = 'Meeting Cancelled';
+            notificationMessage = `Your meeting "${meeting.title}" has been cancelled`;
+          } else if (input.status === 'completed') {
+            notificationTitle = 'Meeting Completed';
+            notificationMessage = `Your meeting "${meeting.title}" has been marked as completed`;
+          } else if (input.status === 'in-progress') {
+            notificationTitle = 'Meeting Started';
+            notificationMessage = `Your meeting "${meeting.title}" is now in progress`;
+          } else {
+            notificationTitle = 'Meeting Updated';
+            notificationMessage = `Your meeting "${meeting.title}" status changed to ${input.status}`;
+          }
+
+          await ctx.db.notification.create({
+            data: {
+              organizationId: notificationOrg.id, // ✅ Use internal database organization ID, not Clerk ID
+              userId: meeting.host.clerkUserId,
+              staffId: meeting.host.id,
+              type: 'meeting_updated',
+              title: notificationTitle,
+              message: notificationMessage,
+              relatedId: meeting.id,
+              relatedType: 'meeting',
+              actionUrl: '/employee/meetings',
+              metadata: {
+                meetingTitle: meeting.title,
+                oldStatus: existingMeeting.status,
+                newStatus: input.status,
+              },
+            },
+          });
+          console.log('[Notification] Host notified of meeting update');
+        } else {
+          console.warn('[Notification] Organization not found for Clerk ID:', ctx.organizationId);
+        }
       }
 
       return meeting;
