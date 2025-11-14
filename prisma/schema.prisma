@@ -42,6 +42,7 @@ model Organization {
   visitors      Visitor[]
   meetings      Meeting[]
   tickets       Ticket[]
+  projects      Project[]
   receptionists Receptionist[]
 
   @@map("organizations")
@@ -104,12 +105,15 @@ model Staff {
   updatedAt DateTime @updatedAt
 
   // Relations
-  meetings        Meeting[]
-  hostedVisitors  Visitor[]       @relation("HostedBy")
-  createdTickets  Ticket[]        @relation("TicketCreator")
-  assignedTickets Ticket[]        @relation("TicketAssignee")
-  ticketMessages  TicketMessage[]
-  notifications   Notification[]
+  meetings           Meeting[]
+  hostedVisitors     Visitor[]       @relation("HostedBy")
+  createdTickets     Ticket[]        @relation("TicketCreator")
+  assignedTickets    Ticket[]        @relation("TicketAssignee")
+  ticketMessages     TicketMessage[]
+  notifications      Notification[]
+  createdProjects    Project[]       @relation("ProjectCreator")
+  assignedProjects   Project[]       @relation("ProjectAssignee")
+  assignedProjectTasks ProjectTask[] @relation("ProjectTaskAssignee")
 
   @@index([organizationId])
   @@index([organizationId, role])
@@ -287,6 +291,10 @@ model Ticket {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Project relation (if converted from ticket)
+  projectId String? @unique
+  project   Project? @relation("TicketProject", fields: [projectId], references: [id], onDelete: SetNull)
+
   // Relations
   messages    TicketMessage[]
   attachments TicketAttachment[]
@@ -295,6 +303,7 @@ model Ticket {
   @@index([organizationId, status])
   @@index([organizationId, createdById])
   @@index([organizationId, assignedToId])
+  @@index([projectId])
   @@index([priority])
   @@index([createdAt])
   @@map("tickets")
@@ -394,4 +403,76 @@ model Notification {
   @@index([isRead])
   @@index([createdAt])
   @@map("notifications")
+}
+
+// IT Project Management System
+model Project {
+  id             String       @id @default(cuid())
+  organizationId String // Multi-tenant field
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Link to ticket if converted from ticket (stored for reference)
+  ticketId String? @unique
+  ticket   Ticket? @relation("TicketProject")
+
+  // Project Details
+  title       String
+  description String  @db.Text
+  status      String  @default("To Do") // To Do, In Progress, Waiting for Review, Done
+  priority    String  @default("Medium") // Low, Medium, High, Critical
+
+  // Assignment
+  assignedToId String?
+  assignedTo   Staff?  @relation("ProjectAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  // Creator
+  createdById String
+  createdBy   Staff   @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  // Dates
+  dueDate     DateTime?
+  completedAt DateTime?
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  tasks ProjectTask[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([organizationId, assignedToId])
+  @@index([organizationId, createdById])
+  @@index([ticketId])
+  @@index([priority])
+  @@index([createdAt])
+  @@map("projects")
+}
+
+model ProjectTask {
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Task Details
+  title       String
+  description String? @db.Text
+  status      String  @default("To Do") // To Do, In Progress, Done
+
+  // Assignment
+  assignedToId String?
+  assignedTo   Staff? @relation("ProjectTaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  // Dates
+  dueDate DateTime?
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([status])
+  @@index([assignedToId])
+  @@map("project_tasks")
 }

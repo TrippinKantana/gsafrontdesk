@@ -140,7 +140,7 @@ export const ticketRouter = createTRPCRouter({
 
         // Create notifications for all IT staff
         const notifications = itStaff.map((itMember) => ({
-          organizationId: ctx.organizationId!,
+          organizationId: organization.id, // ✅ Use internal database organization ID
           userId: itMember.clerkUserId!,
           staffId: itMember.id,
           type: 'ticket_created',
@@ -227,6 +227,8 @@ export const ticketRouter = createTRPCRouter({
 
       const whereClause: any = {
         organizationId: organization.id, // ✅ Filter by organization using internal database ID
+        // Note: All IT staff can view all tickets regardless of assignment.
+        // The assignedToMe filter is optional and only applied when explicitly requested.
       };
 
       if (input.status && input.status !== 'all') {
@@ -237,6 +239,7 @@ export const ticketRouter = createTRPCRouter({
         whereClause.priority = input.priority;
       }
 
+      // Optional filter: only show tickets assigned to current user
       if (input.assignedToMe) {
         whereClause.assignedToId = staff.id;
       }
@@ -376,6 +379,12 @@ export const ticketRouter = createTRPCRouter({
               fullName: true,
               email: true,
               role: true,
+            },
+          },
+          project: {
+            select: {
+              id: true,
+              title: true,
             },
           },
           messages: {
@@ -527,7 +536,10 @@ export const ticketRouter = createTRPCRouter({
             ticket.ticketNumber,
             ticket.title,
             assignedTo.email,
-            ticket.id
+            ticket.id,
+            ticket.priority,
+            ticket.category || undefined,
+            staff.fullName
           ).catch((error) => {
             console.error('Failed to send ticket assignment email:', error);
           });
@@ -535,25 +547,35 @@ export const ticketRouter = createTRPCRouter({
 
         // ✅ Notify assigned IT staff
         if (assignedTo?.clerkUserId && ctx.organizationId) {
-          await ctx.db.notification.create({
-            data: {
-              organizationId: ctx.organizationId,
-              userId: assignedTo.clerkUserId,
-              staffId: assignedTo.id,
-              type: 'ticket_assigned',
-              title: 'Ticket Assigned to You',
-              message: `You have been assigned to ticket ${ticket.ticketNumber}: "${ticket.title}"`,
-              relatedId: ticket.id,
-              relatedType: 'ticket',
-              actionUrl: `/it/tickets/${ticket.id}`,
-              metadata: {
-                ticketNumber: ticket.ticketNumber,
-                priority: ticket.priority,
-                assignedBy: staff.fullName,
-              },
-            },
+          // Convert Clerk organization ID to internal database organization ID
+          const organization = await ctx.db.organization.findUnique({
+            where: { clerkOrgId: ctx.organizationId },
+            select: { id: true },
           });
-          console.log('[Notification] IT staff notified of ticket assignment');
+
+          if (organization) {
+            await ctx.db.notification.create({
+              data: {
+                organizationId: organization.id, // Use internal database organization ID
+                userId: assignedTo.clerkUserId,
+                staffId: assignedTo.id,
+                type: 'ticket_assigned',
+                title: 'Ticket Assigned to You',
+                message: `You have been assigned to ticket ${ticket.ticketNumber}: "${ticket.title}"`,
+                relatedId: ticket.id,
+                relatedType: 'ticket',
+                actionUrl: `/it/tickets/${ticket.id}`,
+                metadata: {
+                  ticketNumber: ticket.ticketNumber,
+                  priority: ticket.priority,
+                  assignedBy: staff.fullName,
+                },
+              },
+            });
+            console.log('[Notification] IT staff notified of ticket assignment');
+          } else {
+            console.warn('[Notification] Organization not found for Clerk ID:', ctx.organizationId);
+          }
         }
       }
 
@@ -565,26 +587,36 @@ export const ticketRouter = createTRPCRouter({
         });
 
         if (creator?.clerkUserId && ctx.organizationId) {
-          await ctx.db.notification.create({
-            data: {
-              organizationId: ctx.organizationId,
-              userId: creator.clerkUserId,
-              staffId: ticket.createdById,
-              type: 'ticket_status_changed',
-              title: 'Ticket Status Updated',
-              message: `Your ticket ${ticket.ticketNumber} status changed from "${existingTicket.status}" to "${input.status}"`,
-              relatedId: ticket.id,
-              relatedType: 'ticket',
-              actionUrl: `/employee/tickets/${ticket.id}`,
-              metadata: {
-                ticketNumber: ticket.ticketNumber,
-                oldStatus: existingTicket.status,
-                newStatus: input.status,
-                updatedBy: staff.fullName,
-              },
-            },
+          // Convert Clerk organization ID to internal database organization ID
+          const organization = await ctx.db.organization.findUnique({
+            where: { clerkOrgId: ctx.organizationId },
+            select: { id: true },
           });
-          console.log('[Notification] Ticket creator notified of status change');
+
+          if (organization) {
+            await ctx.db.notification.create({
+              data: {
+                organizationId: organization.id, // Use internal database organization ID
+                userId: creator.clerkUserId,
+                staffId: ticket.createdById,
+                type: 'ticket_status_changed',
+                title: 'Ticket Status Updated',
+                message: `Your ticket ${ticket.ticketNumber} status changed from "${existingTicket.status}" to "${input.status}"`,
+                relatedId: ticket.id,
+                relatedType: 'ticket',
+                actionUrl: `/employee/tickets/${ticket.id}`,
+                metadata: {
+                  ticketNumber: ticket.ticketNumber,
+                  oldStatus: existingTicket.status,
+                  newStatus: input.status,
+                  updatedBy: staff.fullName,
+                },
+              },
+            });
+            console.log('[Notification] Ticket creator notified of status change');
+          } else {
+            console.warn('[Notification] Organization not found for Clerk ID:', ctx.organizationId);
+          }
         }
       }
 
@@ -720,63 +752,73 @@ export const ticketRouter = createTRPCRouter({
 
         // ✅ Create in-app notifications for recipients (skip internal notes)
         if (ctx.organizationId) {
-          const notifications = [];
+          // Convert Clerk organization ID to internal database organization ID
+          const notificationOrg = await ctx.db.organization.findUnique({
+            where: { clerkOrgId: ctx.organizationId },
+            select: { id: true },
+          });
 
-          // Notify ticket creator if they didn't send this message
-          if (ticket.createdById !== staff.id) {
-            const creator = await ctx.db.staff.findUnique({
-              where: { id: ticket.createdById },
-              select: { clerkUserId: true },
-            });
-            if (creator?.clerkUserId) {
-              notifications.push({
-                organizationId: ctx.organizationId,
-                userId: creator.clerkUserId,
-                staffId: ticket.createdById,
-                type: 'ticket_message',
-                title: 'New Message on Ticket',
-                message: `${staff.fullName} replied to your ticket ${ticket.ticketNumber}: "${input.message.substring(0, 100)}${input.message.length > 100 ? '...' : ''}"`,
-                relatedId: ticket.id,
-                relatedType: 'ticket',
-                actionUrl: `/employee/tickets/${ticket.id}`,
-                metadata: {
-                  ticketNumber: ticket.ticketNumber,
-                  senderName: staff.fullName,
-                },
+          if (notificationOrg) {
+            const notifications = [];
+
+            // Notify ticket creator if they didn't send this message
+            if (ticket.createdById !== staff.id) {
+              const creator = await ctx.db.staff.findUnique({
+                where: { id: ticket.createdById },
+                select: { clerkUserId: true },
               });
+              if (creator?.clerkUserId) {
+                notifications.push({
+                  organizationId: notificationOrg.id, // ✅ Use internal database organization ID
+                  userId: creator.clerkUserId,
+                  staffId: ticket.createdById,
+                  type: 'ticket_message',
+                  title: 'New Message on Ticket',
+                  message: `${staff.fullName} replied to your ticket ${ticket.ticketNumber}: "${input.message.substring(0, 100)}${input.message.length > 100 ? '...' : ''}"`,
+                  relatedId: ticket.id,
+                  relatedType: 'ticket',
+                  actionUrl: `/employee/tickets/${ticket.id}`,
+                  metadata: {
+                    ticketNumber: ticket.ticketNumber,
+                    senderName: staff.fullName,
+                  },
+                });
+              }
             }
-          }
 
-          // Notify assigned IT staff if they didn't send this message
-          if (ticket.assignedToId && ticket.assignedToId !== staff.id) {
-            const assignedStaff = await ctx.db.staff.findUnique({
-              where: { id: ticket.assignedToId },
-              select: { clerkUserId: true },
-            });
-            if (assignedStaff?.clerkUserId) {
-              notifications.push({
-                organizationId: ctx.organizationId,
-                userId: assignedStaff.clerkUserId,
-                staffId: ticket.assignedToId,
-                type: 'ticket_message',
-                title: 'New Message on Ticket',
-                message: `${staff.fullName} added a message to ticket ${ticket.ticketNumber}: "${input.message.substring(0, 100)}${input.message.length > 100 ? '...' : ''}"`,
-                relatedId: ticket.id,
-                relatedType: 'ticket',
-                actionUrl: `/it/tickets/${ticket.id}`,
-                metadata: {
-                  ticketNumber: ticket.ticketNumber,
-                  senderName: staff.fullName,
-                },
+            // Notify assigned IT staff if they didn't send this message
+            if (ticket.assignedToId && ticket.assignedToId !== staff.id) {
+              const assignedStaff = await ctx.db.staff.findUnique({
+                where: { id: ticket.assignedToId },
+                select: { clerkUserId: true },
               });
+              if (assignedStaff?.clerkUserId) {
+                notifications.push({
+                  organizationId: notificationOrg.id, // ✅ Use internal database organization ID
+                  userId: assignedStaff.clerkUserId,
+                  staffId: ticket.assignedToId,
+                  type: 'ticket_message',
+                  title: 'New Message on Ticket',
+                  message: `${staff.fullName} added a message to ticket ${ticket.ticketNumber}: "${input.message.substring(0, 100)}${input.message.length > 100 ? '...' : ''}"`,
+                  relatedId: ticket.id,
+                  relatedType: 'ticket',
+                  actionUrl: `/it/tickets/${ticket.id}`,
+                  metadata: {
+                    ticketNumber: ticket.ticketNumber,
+                    senderName: staff.fullName,
+                  },
+                });
+              }
             }
-          }
 
-          if (notifications.length > 0) {
-            await ctx.db.notification.createMany({
-              data: notifications,
-            });
-            console.log(`[Notification] Created ${notifications.length} ticket message notifications`);
+            if (notifications.length > 0) {
+              await ctx.db.notification.createMany({
+                data: notifications,
+              });
+              console.log(`[Notification] Created ${notifications.length} ticket message notifications`);
+            }
+          } else {
+            console.warn('[Notification] Organization not found for Clerk ID:', ctx.organizationId);
           }
         }
       }

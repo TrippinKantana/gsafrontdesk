@@ -2,8 +2,9 @@
 
 import { trpc } from '@/lib/trpc';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Ticket, Clock, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { Ticket, Clock, CheckCircle, XCircle, AlertTriangle, FolderKanban } from 'lucide-react';
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -167,7 +168,7 @@ export default function ITDashboardPage() {
           <CardDescription>Jump to common tasks</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Link href="/it/tickets?status=Open">
               <div className="p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors cursor-pointer">
                 <Ticket className="h-5 w-5 text-blue-600 mb-2" />
@@ -189,6 +190,14 @@ export default function ITDashboardPage() {
                 <AlertTriangle className="h-5 w-5 text-red-600 mb-2" />
                 <p className="font-medium text-gray-900">Critical Tickets</p>
                 <p className="text-sm text-gray-600 mt-1">High priority issues</p>
+              </div>
+            </Link>
+
+            <Link href="/it/projects">
+              <div className="p-4 border border-gray-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-colors cursor-pointer">
+                <FolderKanban className="h-5 w-5 text-purple-600 mb-2" />
+                <p className="font-medium text-gray-900">Projects</p>
+                <p className="text-sm text-gray-600 mt-1">Manage IT projects</p>
               </div>
             </Link>
           </div>

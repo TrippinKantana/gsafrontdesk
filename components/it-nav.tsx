@@ -1,6 +1,6 @@
 'use client';
 
-import { LayoutDashboard, Ticket, User } from 'lucide-react';
+import { LayoutDashboard, Ticket, User, FolderKanban } from 'lucide-react';
 import { SidebarNav, NavItem } from '@/components/sidebar-nav';
 import { trpc } from '@/lib/trpc';
 
@@ -14,6 +14,11 @@ const baseNavItems: NavItem[] = [
     title: 'Tickets',
     href: '/it/tickets',
     icon: Ticket,
+  },
+  {
+    title: 'Projects',
+    href: '/it/projects',
+    icon: FolderKanban,
   },
 ];
 

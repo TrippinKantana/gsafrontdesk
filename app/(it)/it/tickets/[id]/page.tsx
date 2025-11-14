@@ -17,7 +17,7 @@ import {
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
-import { Clock, ArrowLeft, Send, CheckCircle, XCircle, User, UserPlus } from 'lucide-react';
+import { Clock, ArrowLeft, Send, CheckCircle, XCircle, User, UserPlus, FolderKanban } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import Link from 'next/link';
@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { CreateProjectDialog } from '@/components/projects/create-project-dialog';
 
 export default function TicketDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -35,6 +36,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
   const [message, setMessage] = useState('');
   const [isInternal, setIsInternal] = useState(false);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
+  const [isConvertDialogOpen, setIsConvertDialogOpen] = useState(false);
   const [updateForm, setUpdateForm] = useState<{
     status: 'Open' | 'In Progress' | 'Resolved' | 'Closed' | '';
     priority: 'Low' | 'Medium' | 'High' | 'Critical' | '';
@@ -194,11 +196,74 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                   <CardTitle className="text-2xl">{ticket.title}</CardTitle>
                   <CardDescription className="mt-2">{ticket.description}</CardDescription>
                 </div>
-                <Button onClick={openUpdateDialog} variant="outline" size="sm">
-                  Update Status
-                </Button>
+                <div className="flex flex-col gap-2">
+                  <Button onClick={openUpdateDialog} variant="outline" size="sm">
+                    Update Status
+                  </Button>
+                  {!ticket.project?.id && (
+                    <Button
+                      onClick={() => setIsConvertDialogOpen(true)}
+                      variant="outline"
+                      size="sm"
+                      className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+                    >
+                      <FolderKanban className="h-4 w-4 mr-2" />
+                      Convert to Project
+                    </Button>
+                  )}
+                  {ticket.project?.id && (
+                    <Link href={`/it/projects/${ticket.project.id}`}>
+                      <Button variant="outline" size="sm" className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200">
+                        <FolderKanban className="h-4 w-4 mr-2" />
+                        View Project
+                      </Button>
+                    </Link>
+                  )}
+                </div>
               </div>
             </CardHeader>
+            <CardContent>
+              {/* Assignment Section */}
+              <div className="border-t pt-4 mt-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <UserPlus className="h-5 w-5 text-gray-600" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Assigned To</p>
+                      <p className="text-sm text-gray-900">
+                        {ticket.assignedTo ? (
+                          <span className="font-semibold">{ticket.assignedTo.fullName}</span>
+                        ) : (
+                          <span className="text-gray-500 italic">Unassigned</span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <Select
+                    value={ticket.assignedToId || 'unassigned'}
+                    onValueChange={(value) => handleAssignTicket(value === 'unassigned' ? null : value)}
+                    disabled={updateTicket.isPending}
+                  >
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Select IT staff">
+                        {ticket.assignedTo ? ticket.assignedTo.fullName : 'Assign to...'}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="unassigned">Unassigned</SelectItem>
+                      {itStaff.map((staff) => (
+                        <SelectItem key={staff.id} value={staff.id}>
+                          {staff.fullName} {staff.email ? `(${staff.email})` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {updateTicket.isPending && (
+                  <p className="text-xs text-blue-600 mt-2">Updating assignment...</p>
+                )}
+              </div>
+            </CardContent>
           </Card>
 
           {/* Messages Thread */}
@@ -319,6 +384,11 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
                     ))}
                   </SelectContent>
                 </Select>
+                {ticket.assignedTo && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Assignment changes are tracked and notifications are sent to the assigned staff member.
+                  </p>
+                )}
               </div>
 
               {ticket.category && (
@@ -443,6 +513,21 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Convert to Project Dialog */}
+      {ticket && (
+        <CreateProjectDialog
+          open={isConvertDialogOpen}
+          onOpenChange={setIsConvertDialogOpen}
+          ticketId={ticket.id}
+          initialData={{
+            title: ticket.title,
+            description: ticket.description,
+            priority: ticket.priority as 'Low' | 'Medium' | 'High' | 'Critical',
+            assignedToId: ticket.assignedToId || undefined,
+          }}
+        />
+      )}
     </div>
   );
 }

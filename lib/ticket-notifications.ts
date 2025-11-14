@@ -2,6 +2,7 @@ import { render } from '@react-email/components';
 import TicketCreatedEmail from '@/emails/ticket-created';
 import TicketUpdatedEmail from '@/emails/ticket-updated';
 import TicketMessageEmail from '@/emails/ticket-message';
+import TicketAssignedEmail from '@/emails/ticket-assigned';
 
 let resendClient: any = null;
 
@@ -161,7 +162,10 @@ export async function sendTicketAssignmentEmail(
   ticketNumber: string,
   ticketTitle: string,
   assignedToEmail: string,
-  ticketId: string
+  ticketId: string,
+  priority?: string,
+  category?: string,
+  assignedBy?: string
 ): Promise<boolean> {
   const resend = getResendClient();
   if (!resend) {
@@ -172,18 +176,22 @@ export async function sendTicketAssignmentEmail(
   try {
     const ticketUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/it/tickets/${ticketId}`;
 
+    const html = render(
+      TicketAssignedEmail({
+        ticketNumber,
+        ticketTitle,
+        priority: priority || 'Medium',
+        category,
+        assignedBy,
+        ticketUrl,
+      })
+    );
+
     await resend.emails.send({
       from: process.env.RESEND_FROM_EMAIL || 'noreply@syncco.app',
       to: assignedToEmail,
       subject: `Ticket Assigned to You: ${ticketTitle} [#${ticketNumber}]`,
-      html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px;">
-          <h2>🎫 New Ticket Assignment</h2>
-          <p>A support ticket has been assigned to you.</p>
-          <p><strong>Ticket:</strong> #${ticketNumber} - ${ticketTitle}</p>
-          <p><a href="${ticketUrl}" style="background-color: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">View Ticket</a></p>
-        </div>
-      `,
+      html,
     });
 
     console.log(`✅ Ticket assignment email sent to ${assignedToEmail}`);
