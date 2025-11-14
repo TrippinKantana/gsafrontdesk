@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -56,6 +56,36 @@ export function CreateProjectDialog({
   );
   const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
 
+  // Reset form when dialog opens/closes
+  // Note: initialData is intentionally not in dependencies to avoid unnecessary resets
+  // when parent re-renders with a new object reference
+  useEffect(() => {
+    if (open) {
+      // Dialog opened - populate form with initialData if provided, otherwise reset
+      if (initialData) {
+        setTitle(initialData.title || '');
+        setDescription(initialData.description || '');
+        setPriority((initialData.priority as any) || 'Medium');
+        setAssignedToId(initialData.assignedToId || null);
+        setDueDate(undefined);
+      } else {
+        setTitle('');
+        setDescription('');
+        setPriority('Medium');
+        setAssignedToId(null);
+        setDueDate(undefined);
+      }
+    } else {
+      // Dialog closed - reset form to defaults
+      setTitle('');
+      setDescription('');
+      setPriority('Medium');
+      setAssignedToId(null);
+      setDueDate(undefined);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   const { data: itStaff = [] } = trpc.staff.getAll.useQuery(undefined, {
     select: (staff) => staff.filter((s) => s.role === 'IT Staff' || s.role === 'Admin'),
   });
@@ -76,7 +106,7 @@ export function CreateProjectDialog({
       setAssignedToId(null);
       setDueDate(undefined);
       // Invalidate queries to refresh data
-      utils.project.getBoardData.invalidate();
+      utils.project.getAll.invalidate();
       if (ticketId) {
         utils.ticket.getById.invalidate({ id: ticketId });
       }

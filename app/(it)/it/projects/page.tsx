@@ -26,7 +26,7 @@ export default function ProjectsPage() {
     return projects.filter(
       (project) =>
         project.title.toLowerCase().includes(query) ||
-        project.description?.toLowerCase().includes(query) ||
+        (project.description?.toLowerCase() ?? '').includes(query) ||
         (project.assignedTo?.fullName?.toLowerCase() ?? '').includes(query)
     );
   }, [projects, searchQuery]);
