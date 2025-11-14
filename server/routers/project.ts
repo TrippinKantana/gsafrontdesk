@@ -128,6 +128,22 @@ export const projectRouter = createTRPCRouter({
         },
       });
 
+      // Create default columns for the project
+      const defaultColumns = [
+        { name: 'To Do', color: '#6b7280', order: 0 },
+        { name: 'In Progress', color: '#3b82f6', order: 1 },
+        { name: 'Done', color: '#10b981', order: 2 },
+      ];
+
+      await ctx.db.projectColumn.createMany({
+        data: defaultColumns.map((col) => ({
+          projectId: project.id,
+          name: col.name,
+          color: col.color,
+          order: col.order,
+        })),
+      });
+
       // If created from ticket, update ticket with projectId
       if (input.ticketId) {
         await ctx.db.ticket.update({
@@ -303,16 +319,29 @@ export const projectRouter = createTRPCRouter({
               priority: true,
             },
           },
-          tasks: {
+          columns: {
             orderBy: {
-              createdAt: 'asc',
+              order: 'asc',
             },
+          },
+          tasks: {
+            orderBy: [
+              { order: 'asc' },
+              { createdAt: 'asc' },
+            ],
             include: {
               assignedTo: {
                 select: {
                   id: true,
                   fullName: true,
                   email: true,
+                },
+              },
+              column: {
+                select: {
+                  id: true,
+                  name: true,
+                  color: true,
                 },
               },
             },
@@ -828,13 +857,9 @@ export const projectRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  // Get board data (optimized for Kanban board)
-  getBoardData: protectedProcedure
-    .input(
-      z.object({
-        assignedToMe: z.boolean().optional(),
-      })
-    )
+  // Get project columns and tasks for Kanban board
+  getProjectBoard: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
     .query(async ({ ctx, input }) => {
       if (!ctx.userId) {
         throw new TRPCError({
@@ -847,18 +872,10 @@ export const projectRouter = createTRPCRouter({
         where: { clerkUserId: ctx.userId },
       });
 
-      if (!staff) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Staff profile not found.',
-        });
-      }
-
-      // Only IT Staff and Admin can view projects
-      if (staff.role !== 'IT Staff' && staff.role !== 'Admin') {
+      if (!staff || (staff.role !== 'IT Staff' && staff.role !== 'Admin')) {
         throw new TRPCError({
           code: 'FORBIDDEN',
-          message: 'You do not have permission to view projects.',
+          message: 'You do not have permission to view this project.',
         });
       }
 
@@ -881,28 +898,301 @@ export const projectRouter = createTRPCRouter({
         });
       }
 
-      const whereClause: any = {
-        organizationId: organization.id,
-      };
-
-      if (input.assignedToMe) {
-        whereClause.assignedToId = staff.id;
-      }
-
-      // Fetch all projects for the board
-      const projects = await ctx.db.project.findMany({
-        where: whereClause,
-        orderBy: [
-          { priority: 'desc' }, // Critical first
-          { createdAt: 'desc' },
-        ],
+      const project = await ctx.db.project.findUnique({
+        where: { id: input.projectId, organizationId: organization.id },
         include: {
-          createdBy: {
-            select: {
-              id: true,
-              fullName: true,
+          columns: {
+            orderBy: { order: 'asc' },
+          },
+          tasks: {
+            orderBy: [
+              { order: 'asc' },
+              { createdAt: 'asc' },
+            ],
+            include: {
+              assignedTo: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  email: true,
+                },
+              },
+              column: {
+                select: {
+                  id: true,
+                  name: true,
+                  color: true,
+                },
+              },
             },
           },
+        },
+      });
+
+      if (!project) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Project not found.',
+        });
+      }
+
+      return {
+        columns: project.columns,
+        tasks: project.tasks,
+      };
+    }),
+
+  // Column Management
+  createColumn: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        name: z.string().min(1, 'Column name is required'),
+        color: z.string().default('#3b82f6'),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.userId) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'Not authenticated',
+        });
+      }
+
+      const staff = await ctx.db.staff.findUnique({
+        where: { clerkUserId: ctx.userId },
+      });
+
+      if (!staff || (staff.role !== 'IT Staff' && staff.role !== 'Admin')) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to manage columns.',
+        });
+      }
+
+      if (!ctx.organizationId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Organization context is required.',
+        });
+      }
+
+      const organization = await ctx.db.organization.findUnique({
+        where: { clerkOrgId: ctx.organizationId },
+        select: { id: true },
+      });
+
+      if (!organization) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Organization not found in database.',
+        });
+      }
+
+      // Verify project belongs to organization
+      const project = await ctx.db.project.findUnique({
+        where: { id: input.projectId, organizationId: organization.id },
+        select: { id: true },
+      });
+
+      if (!project) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Project not found.',
+        });
+      }
+
+      // Get max order to append at end
+      const maxColumn = await ctx.db.projectColumn.findFirst({
+        where: { projectId: input.projectId },
+        orderBy: { order: 'desc' },
+        select: { order: true },
+      });
+
+      const column = await ctx.db.projectColumn.create({
+        data: {
+          projectId: input.projectId,
+          name: input.name,
+          color: input.color,
+          order: (maxColumn?.order ?? -1) + 1,
+        },
+      });
+
+      return column;
+    }),
+
+  updateColumn: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        name: z.string().min(1).optional(),
+        color: z.string().optional(),
+        order: z.number().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.userId) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'Not authenticated',
+        });
+      }
+
+      const staff = await ctx.db.staff.findUnique({
+        where: { clerkUserId: ctx.userId },
+      });
+
+      if (!staff || (staff.role !== 'IT Staff' && staff.role !== 'Admin')) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to update columns.',
+        });
+      }
+
+      const { id, ...updateData } = input;
+
+      const column = await ctx.db.projectColumn.update({
+        where: { id },
+        data: updateData,
+      });
+
+      return column;
+    }),
+
+  deleteColumn: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.userId) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'Not authenticated',
+        });
+      }
+
+      const staff = await ctx.db.staff.findUnique({
+        where: { clerkUserId: ctx.userId },
+      });
+
+      if (!staff || (staff.role !== 'IT Staff' && staff.role !== 'Admin')) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to delete columns.',
+        });
+      }
+
+      // Check if column has tasks - if so, we need to handle them
+      const taskCount = await ctx.db.projectTask.count({
+        where: { columnId: input.id },
+      });
+
+      if (taskCount > 0) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Cannot delete column with ${taskCount} task(s). Please move or delete tasks first.`,
+        });
+      }
+
+      await ctx.db.projectColumn.delete({
+        where: { id: input.id },
+      });
+
+      return { success: true };
+    }),
+
+  // Task Management
+  createTask: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        columnId: z.string(),
+        title: z.string().min(1, 'Task title is required'),
+        description: z.string().optional(),
+        assignedToId: z.string().nullable().optional(),
+        dueDate: z.date().nullable().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.userId) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'Not authenticated',
+        });
+      }
+
+      const staff = await ctx.db.staff.findUnique({
+        where: { clerkUserId: ctx.userId },
+      });
+
+      if (!staff || (staff.role !== 'IT Staff' && staff.role !== 'Admin')) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to create tasks.',
+        });
+      }
+
+      if (!ctx.organizationId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Organization context is required.',
+        });
+      }
+
+      const organization = await ctx.db.organization.findUnique({
+        where: { clerkOrgId: ctx.organizationId },
+        select: { id: true },
+      });
+
+      if (!organization) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Organization not found in database.',
+        });
+      }
+
+      // Verify project belongs to organization
+      const project = await ctx.db.project.findUnique({
+        where: { id: input.projectId, organizationId: organization.id },
+        select: { id: true },
+      });
+
+      if (!project) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Project not found.',
+        });
+      }
+
+      // Verify column belongs to project
+      const column = await ctx.db.projectColumn.findUnique({
+        where: { id: input.columnId, projectId: input.projectId },
+        select: { id: true },
+      });
+
+      if (!column) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Column not found in this project.',
+        });
+      }
+
+      // Get max order in column
+      const maxTask = await ctx.db.projectTask.findFirst({
+        where: { columnId: input.columnId },
+        orderBy: { order: 'desc' },
+        select: { order: true },
+      });
+
+      const task = await ctx.db.projectTask.create({
+        data: {
+          projectId: input.projectId,
+          columnId: input.columnId,
+          title: input.title,
+          description: input.description || null,
+          assignedToId: input.assignedToId || null,
+          dueDate: input.dueDate || null,
+          order: (maxTask?.order ?? -1) + 1,
+        },
+        include: {
           assignedTo: {
             select: {
               id: true,
@@ -910,30 +1200,194 @@ export const projectRouter = createTRPCRouter({
               email: true,
             },
           },
-          ticket: {
+          column: {
             select: {
               id: true,
-              ticketNumber: true,
-              title: true,
-            },
-          },
-          _count: {
-            select: {
-              tasks: true,
+              name: true,
+              color: true,
             },
           },
         },
       });
 
-      // Organize by status for board columns
-      const boardData = {
-        'To Do': projects.filter((p) => p.status === 'To Do'),
-        'In Progress': projects.filter((p) => p.status === 'In Progress'),
-        'Waiting for Review': projects.filter((p) => p.status === 'Waiting for Review'),
-        'Done': projects.filter((p) => p.status === 'Done'),
-      };
+      return task;
+    }),
 
-      return boardData;
+  updateTask: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        title: z.string().min(1).optional(),
+        description: z.string().nullable().optional(),
+        assignedToId: z.string().nullable().optional(),
+        dueDate: z.date().nullable().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.userId) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'Not authenticated',
+        });
+      }
+
+      const staff = await ctx.db.staff.findUnique({
+        where: { clerkUserId: ctx.userId },
+      });
+
+      if (!staff || (staff.role !== 'IT Staff' && staff.role !== 'Admin')) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to update tasks.',
+        });
+      }
+
+      const { id, ...updateData } = input;
+
+      const task = await ctx.db.projectTask.update({
+        where: { id },
+        data: updateData,
+        include: {
+          assignedTo: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+            },
+          },
+          column: {
+            select: {
+              id: true,
+              name: true,
+              color: true,
+            },
+          },
+        },
+      });
+
+      return task;
+    }),
+
+  moveTask: protectedProcedure
+    .input(
+      z.object({
+        taskId: z.string(),
+        columnId: z.string(),
+        order: z.number().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.userId) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'Not authenticated',
+        });
+      }
+
+      const staff = await ctx.db.staff.findUnique({
+        where: { clerkUserId: ctx.userId },
+      });
+
+      if (!staff || (staff.role !== 'IT Staff' && staff.role !== 'Admin')) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to move tasks.',
+        });
+      }
+
+      // Get task to verify it exists
+      const task = await ctx.db.projectTask.findUnique({
+        where: { id: input.taskId },
+        select: { id: true, columnId: true, projectId: true },
+      });
+
+      if (!task) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Task not found.',
+        });
+      }
+
+      // Verify column belongs to same project
+      const column = await ctx.db.projectColumn.findUnique({
+        where: { id: input.columnId, projectId: task.projectId },
+        select: { id: true },
+      });
+
+      if (!column) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Column not found in this project.',
+        });
+      }
+
+      // If moving to different column, update order
+      let newOrder = input.order;
+      if (task.columnId !== input.columnId || newOrder === undefined) {
+        if (newOrder === undefined) {
+          // Append to end of new column
+          const maxTask = await ctx.db.projectTask.findFirst({
+            where: { columnId: input.columnId },
+            orderBy: { order: 'desc' },
+            select: { order: true },
+          });
+          newOrder = (maxTask?.order ?? -1) + 1;
+        }
+      }
+
+      const updatedTask = await ctx.db.projectTask.update({
+        where: { id: input.taskId },
+        data: {
+          columnId: input.columnId,
+          order: newOrder,
+        },
+        include: {
+          assignedTo: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+            },
+          },
+          column: {
+            select: {
+              id: true,
+              name: true,
+              color: true,
+            },
+          },
+        },
+      });
+
+      return updatedTask;
+    }),
+
+  deleteTask: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.userId) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'Not authenticated',
+        });
+      }
+
+      const staff = await ctx.db.staff.findUnique({
+        where: { clerkUserId: ctx.userId },
+      });
+
+      if (!staff || (staff.role !== 'IT Staff' && staff.role !== 'Admin')) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to delete tasks.',
+        });
+      }
+
+      await ctx.db.projectTask.delete({
+        where: { id: input.id },
+      });
+
+      return { success: true };
     }),
 });
 

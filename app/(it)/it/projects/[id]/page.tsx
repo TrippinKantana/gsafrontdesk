@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ArrowLeft, Clock, User, UserPlus, Ticket, Calendar, Edit, Trash2 } from 'lucide-react';
+import { TaskKanbanBoard } from '@/components/projects/task-kanban-board';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import Link from 'next/link';
@@ -220,34 +221,16 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
             </CardHeader>
           </Card>
 
-          {/* Tasks Section */}
-          {project.tasks && project.tasks.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Tasks ({project.tasks.length})</CardTitle>
-                <CardDescription>Project tasks and subtasks</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {project.tasks.map((task) => (
-                    <div key={task.id} className="p-3 border rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">{task.title}</p>
-                          {task.description && (
-                            <p className="text-sm text-gray-600">{task.description}</p>
-                          )}
-                        </div>
-                        <span className={`px-2 py-1 rounded text-xs ${getStatusColor(task.status)}`}>
-                          {task.status}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          {/* Tasks Kanban Board */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Tasks</CardTitle>
+              <CardDescription>Manage project tasks with the Kanban board</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <TaskKanbanBoard projectId={params.id} />
+            </CardContent>
+          </Card>
         </div>
 
         {/* Sidebar */}

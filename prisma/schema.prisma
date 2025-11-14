@@ -439,6 +439,7 @@ model Project {
 
   // Relations
   tasks ProjectTask[]
+  columns ProjectColumn[]
 
   @@index([organizationId])
   @@index([organizationId, status])
@@ -450,6 +451,29 @@ model Project {
   @@map("projects")
 }
 
+// Customizable Kanban columns/boards for a project
+model ProjectColumn {
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Column Details
+  name  String
+  color String @default("#3b82f6") // Hex color code
+  order Int    @default(0) // Display order
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  tasks ProjectTask[]
+
+  @@index([projectId])
+  @@index([projectId, order])
+  @@map("project_columns")
+}
+
 model ProjectTask {
   id        String  @id @default(cuid())
   projectId String
@@ -458,7 +482,10 @@ model ProjectTask {
   // Task Details
   title       String
   description String? @db.Text
-  status      String  @default("To Do") // To Do, In Progress, Done
+
+  // Column assignment (replaces status)
+  columnId String
+  column   ProjectColumn @relation(fields: [columnId], references: [id], onDelete: Cascade)
 
   // Assignment
   assignedToId String?
@@ -467,12 +494,16 @@ model ProjectTask {
   // Dates
   dueDate DateTime?
 
+  // Order within column
+  order Int @default(0)
+
   // Metadata
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([projectId])
-  @@index([status])
+  @@index([columnId])
   @@index([assignedToId])
+  @@index([columnId, order])
   @@map("project_tasks")
 }
