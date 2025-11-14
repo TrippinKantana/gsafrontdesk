@@ -151,7 +151,9 @@ export const staffRouter = createTRPCRouter({
             lastName: input.fullName.split(' ').slice(1).join(' ') || undefined,
             skipPasswordChecks: true, // Skip password strength requirements
             skipPasswordRequirement: false,
-            legalAcceptedAt: new Date().toISOString(), // Required when "Require express consent to legal documents" is enabled in Clerk
+            unsafeMetadata: {
+              legal_accepted_at: new Date().toISOString(), // Required when "Require express consent to legal documents" is enabled in Clerk
+            },
           });
 
           clerkUserId = clerkUser.id;
@@ -409,7 +411,9 @@ export const staffRouter = createTRPCRouter({
             lastName: input.fullName.split(' ').slice(1).join(' ') || undefined,
             skipPasswordChecks: true, // Skip password strength requirements
             skipPasswordRequirement: false,
-            legalAcceptedAt: new Date().toISOString(), // Required when "Require express consent to legal documents" is enabled in Clerk
+            unsafeMetadata: {
+              legal_accepted_at: new Date().toISOString(), // Required when "Require express consent to legal documents" is enabled in Clerk
+            },
           });
 
           clerkUserId = clerkUser.id;

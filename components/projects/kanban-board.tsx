@@ -189,7 +189,11 @@ export function KanbanBoard({ assignedToMe = false, onProjectClick }: KanbanBoar
                           title={project.title}
                           description={project.description}
                           priority={project.priority}
-                          assignedTo={project.assignedTo}
+                          assignedTo={project.assignedTo ? {
+                            id: project.assignedTo.id,
+                            fullName: project.assignedTo.fullName,
+                            email: project.assignedTo.email || undefined,
+                          } : undefined}
                           dueDate={project.dueDate}
                           ticket={project.ticket}
                           taskCount={project._count?.tasks}
@@ -218,7 +222,11 @@ export function KanbanBoard({ assignedToMe = false, onProjectClick }: KanbanBoar
               title={activeProject.title}
               description={activeProject.description}
               priority={activeProject.priority}
-              assignedTo={activeProject.assignedTo}
+              assignedTo={activeProject.assignedTo ? {
+                id: activeProject.assignedTo.id,
+                fullName: activeProject.assignedTo.fullName,
+                email: activeProject.assignedTo.email || undefined,
+              } : undefined}
               dueDate={activeProject.dueDate}
               ticket={activeProject.ticket}
               taskCount={activeProject._count?.tasks}
