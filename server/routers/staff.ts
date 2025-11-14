@@ -151,12 +151,15 @@ export const staffRouter = createTRPCRouter({
             lastName: input.fullName.split(' ').slice(1).join(' ') || undefined,
             skipPasswordChecks: true, // Skip password strength requirements
             skipPasswordRequirement: false,
-            unsafeMetadata: {
-              legal_accepted_at: new Date().toISOString(), // Required when "Require express consent to legal documents" is enabled in Clerk
-            },
           });
 
           clerkUserId = clerkUser.id;
+
+          // Set legalAcceptedAt via updateUser (required when "Require express consent to legal documents" is enabled in Clerk)
+          // Note: TypeScript types may not include this property, but Clerk API accepts it
+          await clerk.users.updateUser(clerkUserId, {
+            legalAcceptedAt: new Date().toISOString(),
+          } as any);
 
           // ✅ First, look up the organization in our database to get the internal ID
           organization = await ctx.db.organization.findUnique({
@@ -411,12 +414,15 @@ export const staffRouter = createTRPCRouter({
             lastName: input.fullName.split(' ').slice(1).join(' ') || undefined,
             skipPasswordChecks: true, // Skip password strength requirements
             skipPasswordRequirement: false,
-            unsafeMetadata: {
-              legal_accepted_at: new Date().toISOString(), // Required when "Require express consent to legal documents" is enabled in Clerk
-            },
           });
 
           clerkUserId = clerkUser.id;
+
+          // Set legalAcceptedAt via updateUser (required when "Require express consent to legal documents" is enabled in Clerk)
+          // Note: TypeScript types may not include this property, but Clerk API accepts it
+          await clerk.users.updateUser(clerkUserId, {
+            legalAcceptedAt: new Date().toISOString(),
+          } as any);
 
           // ✅ Look up organization to get internal database ID
           if (!ctx.organizationId) {
